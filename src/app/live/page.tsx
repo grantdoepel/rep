@@ -10,7 +10,7 @@ export default function Live() {
   return (
     <div className="screen">
       <TopBar back="/friends" right={<div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-lime a-blink" /><span className="text-[12px] font-bold text-lime tracking-[1.5px] uppercase">Live</span></div>} />
-      <div className="px-6 pt-5"><div className="display text-[30px]">Moving right now</div><div className="text-[13px] text-muted mt-1.5 font-medium">{moving.length} people you know · 212 in your league</div></div>
+      <div className="px-6 pt-4"><div className="display t-h1">Moving right now</div><div className="text-[13px] text-muted mt-1.5 font-medium">{moving.length} people you know · 212 in your league</div></div>
       <div className="flex flex-col gap-2.5 px-6 pt-5">
         {moving.length === 0 && <div className="bg-ink-3 rounded-[20px] p-5 text-[14px] text-muted leading-[1.4]">Nobody you know is mid-Set this minute. Start one and you'll be the one they join.</div>}
         {moving.map((f, i) => (

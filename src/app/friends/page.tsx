@@ -33,9 +33,9 @@ export default function Friends() {
 
   return (
     <div className="screen">
-      <div className="safe-top px-6 pt-10 flex items-end justify-between">
-        <div><div className="display text-[30px]">Friends</div><div className="text-[13px] text-muted mt-1.5 font-medium">{s.friends.filter((f) => f.doneToday).length} already beat yesterday</div></div>
-        <button aria-label="Invite a friend" onClick={invite} className="w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+      <div className="safe-top px-6 pt-8 flex items-end justify-between">
+        <div><div className="t-micro text-muted">{s.friends.length ? `${s.friends.filter((f) => f.doneToday).length} of ${s.friends.length} moved today` : "You vs. you, together"}</div><div className="display t-h1 mt-1.5">Friends</div></div>
+        <button aria-label="Invite a friend" onClick={invite} className="press w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
       </div>
 
       {moving.length > 0 && (
@@ -93,7 +93,7 @@ export default function Friends() {
 
       {shots.length > 0 && (
         <div className="px-6 pt-4">
-          <div className="text-[11px] font-bold text-muted tracking-[1px] uppercase pb-2">Proof shots · last 24h</div>
+          <div className="t-micro text-muted pb-2">Proof shots · last 24h</div>
           <div className="flex gap-2 overflow-x-auto pb-1">{shots.map((p) => <div key={p.id} className="relative shrink-0 w-[96px] aspect-[3/4] rounded-xl overflow-hidden"><img src={p.dataUrl} alt="Proof shot" className="w-full h-full object-cover" /><div className="absolute left-1.5 bottom-1.5 text-[10px] font-bold bg-ink/70 rounded-full px-2 py-0.5">You</div></div>)}</div>
         </div>
       )}
@@ -111,7 +111,7 @@ export default function Friends() {
       )}
 
       <div className="flex flex-col gap-2 px-6 pt-4 pb-5">
-        {s.friends.length > 0 && <div className="text-[11px] font-bold text-muted tracking-[1px] uppercase pb-0.5">This week</div>}
+        {s.friends.length > 0 && <div className="t-micro text-muted pb-0.5 pt-1">This week</div>}
         {s.friends.map((f) => {
           const nudged = s.nudgedToday.includes(f.id);
           const cheered = s.cheered.includes(f.id);

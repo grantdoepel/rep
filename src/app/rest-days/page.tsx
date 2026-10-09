@@ -28,7 +28,7 @@ export default function RestDays() {
     <div className="screen">
       <TopBar title="Settings" back="/profile" />
       <div className="px-6 pt-6">
-        <div className="flex items-center gap-3"><svg className="a-bob" width="36" height="36" viewBox="0 0 24 24" fill="#3D4EFF" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg><div className="display text-[28px]">Rest counts too.</div></div>
+        <div className="flex items-center gap-3"><svg className="a-bob" width="36" height="36" viewBox="0 0 24 24" fill="#3D4EFF" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg><div className="display t-h2">Rest counts too.</div></div>
         <div className="text-[14px] text-muted mt-3 leading-[1.45]">Pick up to two days a week. On those days a 3-minute Mobility Set keeps your streak, the Set generator plans around them, and the mascot stops nagging.</div>
       </div>
       <div className="flex justify-between px-6 pt-5">{[1, 2, 3, 4, 5, 6, 0].map((d) => { const on = days.includes(d); return <button key={d} onClick={() => toggle(d)} className={`w-[42px] h-14 rounded-[14px] font-extrabold text-[14px] flex flex-col items-center justify-center gap-1 ${on ? "bg-blue text-text" : "bg-ink-3 text-muted"}`}>{DAYS[d][0]}<span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? "#F4F5F7" : "transparent" }} /></button>; })}</div>
@@ -36,20 +36,20 @@ export default function RestDays() {
 
       <div className="mx-6 mt-5"><Mascot line="Rest day. I mean it. Three minutes of stretching and then go sit down. You earned the sitting." /></div>
 
-      <div className="px-6 pt-6"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase">Daily goal</div>
+      <div className="px-6 pt-6"><div className="t-micro text-muted">Daily goal</div>
         <div className="flex bg-ink-3 rounded-full p-1 mt-2.5">{(["casual", "regular", "serious"] as const).map((k) => <button key={k} onClick={() => setGoal(k)} className={`flex-1 h-10 rounded-full font-bold text-[13px] capitalize ${goal === k ? "bg-lime text-ink" : "text-muted"}`}>{k}</button>)}</div></div>
-      <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase">Where you train</div>
+      <div className="px-6 pt-4"><div className="t-micro text-muted">Where you train</div>
         <div className="flex bg-ink-3 rounded-full p-1 mt-2.5">{(["home", "gym", "travel"] as const).map((k) => <button key={k} onClick={() => setEnv(k)} className={`flex-1 h-10 rounded-full font-bold text-[13px] capitalize ${env === k ? "bg-lime text-ink" : "text-muted"}`}>{k}</button>)}</div></div>
-      <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase">Work around</div>
+      <div className="px-6 pt-4"><div className="t-micro text-muted">Work around</div>
         <div className="flex flex-wrap gap-2 mt-2.5">{FLAGS.map(([f, n]) => <button key={f} onClick={() => setFlags(flags.includes(f) ? flags.filter((x) => x !== f) : [...flags, f])} className={`h-9 px-3 rounded-full border-[1.5px] font-bold text-[12px] ${flags.includes(f) ? "border-lime bg-lime/8" : "border-ink-4 bg-ink-3 text-muted"}`}>{n}</button>)}</div>
         <div className="text-[12px] text-muted mt-2.5 leading-[1.4]">Every track keeps a full tree; movements swap, levels don't shrink. A level cleared at Foundation is cleared.</div></div>
 
-      <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase">Gym arrival reminder</div>
+      <div className="px-6 pt-4"><div className="t-micro text-muted">Gym arrival reminder</div>
         <div className="flex gap-2 mt-2.5"><input value={gymName} onChange={(e) => setGymName(e.target.value)} placeholder="Gym name" className="flex-1 h-11 rounded-xl bg-ink-3 border-[1.5px] border-ink-4 px-3.5 text-[14px] outline-none focus:border-lime" /><button onClick={saveGym} className="h-11 px-4 rounded-xl bg-ink-3 font-bold text-[13px] text-lime">{s.profile.gymLat ? "Re-pin" : "Pin here"}</button></div>
         <div className="text-[12px] text-muted mt-2 leading-[1.4]">{gymStatus ?? (s.profile.gymLat ? `Pinned: ${s.profile.gymName}. Arrive and uvu asks for a proof shot.` : "Stand at the gym door and tap Pin here. Only your device keeps the coordinates.")}</div></div>
 
-      <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase mb-2.5">Account</div><Account /></div>
-      <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase mb-2.5">Reminders</div><Reminders /></div>
+      <div className="px-6 pt-4"><div className="t-micro text-muted mb-2.5">Account</div><Account /></div>
+      <div className="px-6 pt-4"><div className="t-micro text-muted mb-2.5">Reminders</div><Reminders /></div>
 
       <div className="mt-auto px-6 pb-8 safe-bottom pt-5"><button onClick={save} className="h-14 rounded-2xl bg-lime text-ink font-extrabold text-[16px] w-full">Save</button></div>
     </div>

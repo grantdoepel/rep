@@ -31,6 +31,8 @@ export interface State {
   adaptiveNote?: string;
   seenMonday?: string;
   seenMilestone?: number;
+  // the ledger: the last number you put up for each movement. "yesterday-you" everywhere.
+  recent: Record<string, { date: string; achieved: number; target: number }>;
   online: boolean;              // signed in: friends/league/duo come from the server
   userId?: string;
   inviteCode?: string;
@@ -44,7 +46,7 @@ type Actions = {
   startSet: (kind?: "normal" | "rescue") => DailySet;
   recordMove: (i: number, achieved: number) => void;
   swapEasier: (i: number) => void;
-  finishSet: () => { xp: number; perfect: boolean; crownUps: Track[] };
+  finishSet: (final?: { index: number; achieved: number }) => { xp: number; perfect: boolean; crownUps: Track[]; beats: number; moves: number };
   useFreeze: () => boolean;
   nudge: (friendId: string) => void;
   cheer: (friendId: string) => void;
@@ -91,7 +93,7 @@ function initial(): State {
     profile: { id: "local", username: "you", displayName: "You", goalTier: "regular", environment: "home", tier: "standard", timezone: tz, restDays: [0], injuryFlags: [], accessibility: [], createdAt: "" },
     crowns: {}, streak: { current: 0, longest: 0, freezes: 2 }, gems: 0, xpTotal: 0, xpWeek: 0,
     log: [], leagueTier: "bronze", league: seedLeague(0, friends), friends, nudgedToday: [], cheered: [], proofShots: [], pinkyPromises: [], pinkyUsedThisMonth: 0, awards: [],
-    online: false,
+    recent: {}, online: false,
   };
 }
 
@@ -102,7 +104,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const sRef = useRef(s); sRef.current = s;
 
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) { const saved = JSON.parse(raw) as State; setS({ ...initial(), ...saved, hydrated: true, profile: { ...saved.profile, createdAt: saved.profile.createdAt || new Date().toISOString() } }); return; } } catch {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const saved = JSON.parse(raw) as State; setS({ ...initial(), ...saved, recent: saved.recent ?? {}, hydrated: true, profile: { ...saved.profile, createdAt: saved.profile.createdAt || new Date().toISOString() } }); return; } } catch {}
     setS((x) => ({ ...x, hydrated: true, profile: { ...x.profile, createdAt: new Date().toISOString() } }));
   }, []);
   useEffect(() => { if (s.hydrated) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} } }, [s]);
@@ -184,26 +186,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const moves: SetMove[] = x.active.moves.map((m, j) => (j === i ? { movement: reg.id, target: Math.round(m.target * 1.25), unit: reg.unit, achieved: undefined } : m));
       return { ...x, active: { ...x.active, moves } };
     }),
-    finishSet: () => {
-      let result = { xp: 0, perfect: false, crownUps: [] as Track[] };
-      set((x) => {
-        if (!x.active) return x;
-        const today = localDate(new Date(), x.profile.timezone);
-        const firstOfDay = !(x.today && x.today.date === today && x.today.status === "done");
-        const { crowns, crownUps } = applyCrownProgress(x.crowns, x.active, x.profile.environment);
-        const { xp, perfect } = scoreSet(x.active.moves, { firstOfDay, crownUp: crownUps.length > 0, rescue: x.active.kind === "rescue" });
-        const done: DailySet = { ...x.active, status: "done", xp, perfect };
-        const streak = countDay(x.streak, today);
-        const adaptiveNote = Object.entries(crowns).find(([, c]) => c.misses >= 2) ? "Two days short on a track. Tomorrow's Set steps down one level; it comes back after 3 clean days." : undefined;
-        const log = x.log.filter((l) => l.date !== today).concat({ date: today, kind: x.active.kind === "rest" || x.active.kind === "rescue" ? "rest" : perfect ? "perfect" : "done" });
-        const gems = x.gems + (perfect ? 10 : 0) + crownUps.length * 25;
-        const friends = x.friends.map((f) => (f.movingNow ? { ...f, movingNow: false, doneToday: true } : f));
-        const league = x.league.map((r) => (r.isYou ? { ...r, xp: x.xpWeek + xp, sets: r.sets + (firstOfDay ? 1 : 0) } : r)).sort((a, b) => b.xp - a.xp);
-        result = { xp, perfect, crownUps };
-        sync.setResult(x.profile.id, done, crowns, streak).then(() => { if (x.online) pull(); });
-        return { ...x, active: undefined, today: done, lastDone: done, crowns, streak, xpTotal: x.xpTotal + xp, xpWeek: x.xpWeek + xp, gems, log, adaptiveNote, league, friends, duo: x.duo ? { ...x.duo, yourXp: x.duo.yourXp + xp } : x.duo };
-      });
-      return result;
+    finishSet: (final) => {
+      // Computed from the current snapshot (plus the final move passed in), then committed in one update:
+      // a function updater here can be deferred by React when another update is queued, which lost the result.
+      const x = sRef.current;
+      if (!x.active) return { xp: 0, perfect: false, crownUps: [], beats: 0, moves: 0 };
+      const active = final ? { ...x.active, moves: x.active.moves.map((m, j) => (j === final.index ? { ...m, achieved: final.achieved } : m)) } : x.active;
+      const today = localDate(new Date(), x.profile.timezone);
+      const firstOfDay = !(x.today && x.today.date === today && x.today.status === "done");
+      const { crowns, crownUps } = applyCrownProgress(x.crowns, active, x.profile.environment);
+      const scored = scoreSet(active.moves, { firstOfDay, crownUp: crownUps.length > 0, rescue: active.kind === "rescue" });
+      const effort = active.moves.filter((m) => (m.achieved ?? 0) > 0).length;
+      const xp = effort > 0 ? Math.max(10, scored.xp) : 0;   // any effort is worth something; nothing is worth nothing
+      const perfect = scored.perfect;
+      // you vs. you: compare each move with the last time you did it, then write today into the ledger
+      let beats = 0; const recent = { ...x.recent };
+      for (const m of active.moves) { const prev = recent[m.movement]; const a = m.achieved ?? 0; if (prev && prev.date < today && a > prev.achieved) beats++; if (a > 0) recent[m.movement] = { date: today, achieved: Math.max(a, prev?.date === today ? prev.achieved : 0), target: m.target }; }
+      const done: DailySet = { ...active, status: "done", xp, perfect };
+      const streak = effort > 0 ? countDay(x.streak, today) : x.streak;
+      const adaptiveNote = Object.entries(crowns).find(([, c]) => c.misses >= 2) ? "Two days short on a track. Tomorrow's Set steps down one level; it comes back after 3 clean days." : undefined;
+      const log = effort > 0 ? x.log.filter((l) => l.date !== today).concat({ date: today, kind: active.kind === "rest" || active.kind === "rescue" ? "rest" : perfect ? "perfect" : "done" }) : x.log;
+      const gems = x.gems + (perfect ? 10 : 0) + crownUps.length * 25;
+      const friends = x.friends.map((f) => (f.movingNow ? { ...f, movingNow: false, doneToday: true } : f));
+      const league = x.league.map((r) => (r.isYou ? { ...r, xp: x.xpWeek + xp, sets: r.sets + (firstOfDay && effort > 0 ? 1 : 0) } : r)).sort((a, b) => b.xp - a.xp);
+      if (effort > 0) sync.setResult(x.profile.id, done, crowns, streak).then(() => { if (x.online) pull(); });
+      const next: State = { ...x, recent, active: undefined, today: effort > 0 ? done : x.today, lastDone: done, crowns, streak, xpTotal: x.xpTotal + xp, xpWeek: x.xpWeek + xp, gems, log, adaptiveNote, league, friends, duo: x.duo ? { ...x.duo, yourXp: x.duo.yourXp + xp } : x.duo };
+      setS(next); sRef.current = next;
+      return { xp, perfect, crownUps, beats, moves: effort };
     },
     useFreeze: () => {
       let ok = false;

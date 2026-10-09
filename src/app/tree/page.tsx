@@ -2,55 +2,66 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { CROWN_LEVELS, MOVEMENT_BY_ID, TRACKS } from "@/lib/content";
-import type { Environment, Tier, Track } from "@/lib/types";
-import { Icon, TabBar } from "@/components/ui";
+import type { Tier, Track } from "@/lib/types";
+import { Icon, Ring, Section, TabBar } from "@/components/ui";
 
 const TIERS: Tier[] = ["foundation", "standard", "advanced"];
 
-export default function Tree() {
+export default function Crowns() {
   const s = useStore();
-  const [open, setOpen] = useState<Track>("push");
+  const [open, setOpen] = useState<Track | null>(null);
   const env = s.profile.environment;
-  const total = TRACKS.reduce((a, t) => a + ((s.crowns[t.id]?.level ?? 1) - 1), 0) + TRACKS.filter((t) => (s.crowns[t.id]?.level ?? 1) >= 5).length;
-  const setEnv = (e: Environment) => s.updateProfile({ environment: e });
+  const earned = TRACKS.reduce((a, t) => a + ((s.crowns[t.id]?.level ?? 1) - 1), 0);
   const cycleTier = () => s.updateProfile({ tier: TIERS[(TIERS.indexOf(s.profile.tier) + 1) % 3] });
+  const openTrack = open ? TRACKS.find((t) => t.id === open) : null;
+  const oc = open ? s.crowns[open] ?? { level: 1, clears: 0, misses: 0 } : null;
+  const olvl = open && oc ? CROWN_LEVELS.find((l) => l.track === open && l.level === oc.level) : null;
+  const reqs = olvl ? (env === "gym" ? olvl.gym : olvl.requirements) : [];
 
   return (
     <div className="screen">
-      <div className="safe-top px-6 pt-10">
-        <div className="display text-[30px]">Your tree</div>
-        <div className="text-[13px] text-muted mt-1.5 font-medium">{total} of 30 crowns · same tree, wherever you train</div>
-      </div>
-      <div className="flex items-center gap-2.5 px-6 pt-4">
-        <div className="flex bg-ink-3 rounded-full p-1 flex-1">{(["home", "gym", "travel"] as const).map((e) => <button key={e} onClick={() => setEnv(e)} className={`flex-1 h-[38px] rounded-full font-bold text-[13px] capitalize ${env === e ? "bg-lime text-ink" : "text-muted"}`}>{e}</button>)}</div>
-        <button onClick={cycleTier} className="h-[46px] px-3.5 rounded-full border-[1.5px] border-ink-4 text-lime font-bold text-[13px] capitalize whitespace-nowrap">{s.profile.tier}</button>
+      <div className="safe-top px-6 pt-8 flex items-end justify-between">
+        <div><div className="t-micro text-muted">Six tracks · five crowns each</div><div className="display t-h1 mt-1.5">Crowns</div></div>
+        <div className="text-right"><div className="t-num text-[28px]">{earned}<span className="t-small font-bold text-muted-2">/30</span></div></div>
       </div>
 
-      <div className="flex flex-col gap-2.5 px-6 pt-4 pb-5">
+      {/* six rings. Fill = clears toward the next crown; the number is the crown you hold. */}
+      <div className="grid grid-cols-3 gap-x-2 gap-y-4 px-6 pt-6">
         {TRACKS.map((t) => {
           const c = s.crowns[t.id] ?? { level: 1, clears: 0, misses: 0 };
-          const lvl = CROWN_LEVELS.find((l) => l.track === t.id && l.level === c.level)!;
-          const reqs = env === "gym" ? lvl.gym : lvl.requirements;
-          const isOpen = open === t.id;
+          const maxed = c.level >= 5 && c.clears >= 3;
+          const on = open === t.id;
           return (
-            <div key={t.id} className={`bg-ink-3 rounded-[20px] p-4 ${isOpen ? "border-[1.5px] border-lime" : ""}`}>
-              <button onClick={() => setOpen(t.id)} className="w-full flex items-center justify-between text-left">
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isOpen ? "bg-lime" : "bg-ink-4"}`}><Icon.Crown size={18} color={isOpen ? "#0C0D11" : "#F4F5F7"} filled={false} /></div>
-                  <div><div className="font-extrabold text-[16px]">{t.name}</div><div className="text-[12px] text-muted font-semibold">Crown {c.level} · {c.level >= 5 && c.clears >= 3 ? "maxed" : `${c.clears} of 3 clears`}{c.misses >= 2 ? " · adjusted" : ""}</div></div>
-                </div>
-                <div className="flex gap-1">{[1, 2, 3, 4, 5].map((n) => <Icon.Crown key={n} size={18} filled={n < c.level} color={n <= c.level ? "#C8FF3D" : "#2A2D38"} />)}</div>
-              </button>
-              {isOpen && (
-                <div className="mt-3.5 flex flex-col gap-1.5">
-                  {reqs.map((r) => { const mv = MOVEMENT_BY_ID[r.movement]; return <div key={r.movement} className="flex justify-between items-center text-[13px] px-2.5 py-2 bg-ink rounded-[10px]"><span className="font-semibold">{mv.name}</span><span className="text-lime font-bold">{r.target} {mv.unit === "seconds" ? "s" : ""}</span></div>; })}
-                  <div className="text-[12px] text-muted mt-1 leading-[1.4]">{c.level >= 5 ? "Top of the track. Targets keep rising a little each clear." : `Hit every target in ${3 - c.clears} more Set${3 - c.clears === 1 ? "" : "s"} on different days and Crown ${c.level + 1} is yours.`}</div>
-                </div>
-              )}
-            </div>
+            <button key={t.id} onClick={() => setOpen(on ? null : t.id)} aria-expanded={on} className="press flex flex-col items-center gap-2 py-1">
+              <Ring value={maxed ? 1 : c.clears / 3} size={92} width={7} color={on || maxed ? "#C8FF3D" : "#F4F5F7"}>
+                <div className="text-center"><div className={`t-num text-[26px] ${on ? "text-lime" : ""}`}>{c.level}</div><div className="t-micro text-muted-2 -mt-0.5" style={{ fontSize: 9 }}>crown</div></div>
+              </Ring>
+              <div className={`t-small font-bold ${on ? "text-lime" : ""}`}>{t.name}</div>
+              <div className="t-micro text-muted-2" style={{ fontSize: 10 }}>{maxed ? "maxed" : `${c.clears}/3 clears`}{c.misses >= 2 ? " · eased" : ""}</div>
+            </button>
           );
         })}
       </div>
+
+      {openTrack && oc && (
+        <Section title={`${openTrack.name} · Crown ${oc.level} targets`} right={<span className="t-small text-muted-2 font-semibold capitalize">{env} · {s.profile.tier}</span>} className="mt-5 a-rise">
+          <div className="flex flex-col">
+            {reqs.map((r) => { const mv = MOVEMENT_BY_ID[r.movement]; const last = s.recent[r.movement]; return (
+              <div key={r.movement} className="flex items-center justify-between py-2.5 border-t border-hair first:border-t-0">
+                <span className="t-body font-semibold">{mv.name}</span>
+                <span className="t-num text-[17px] flex items-baseline gap-2">{last && <span className="ghost">{last.achieved}</span>}<span className={last && last.achieved >= r.target ? "text-lime" : ""}>{r.target}{mv.unit === "seconds" ? "s" : ""}</span></span>
+              </div>
+            ); })}
+          </div>
+          <div className="t-small text-muted mt-3 leading-[1.45]">{oc.level >= 5 ? "Top of the track. Targets keep rising a little each clear." : `Hit every target in ${3 - oc.clears} more Set${3 - oc.clears === 1 ? "" : "s"} on different days and Crown ${oc.level + 1} is yours. Your last number sits in blue.`}</div>
+        </Section>
+      )}
+
+      <Section title="How it works" className="mt-5">
+        <div className="t-small text-muted leading-[1.5]">Every track keeps a full ladder wherever you train. Movements swap for {env === "gym" ? "home" : "gym"} equipment; the crown does not. Two short days in a row ease a track by one step until three clean Sets bring it back.</div>
+        <button onClick={cycleTier} className="press mt-3 h-10 px-3.5 -ml-3.5 rounded-full text-lime t-small font-bold flex items-center gap-2"><Icon.Crown size={14} filled={false} />Difficulty: <span className="capitalize">{s.profile.tier}</span> · tap to change</button>
+      </Section>
+      <div className="h-5" />
       <TabBar />
     </div>
   );

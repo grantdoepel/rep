@@ -50,17 +50,20 @@ export default function Start() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, step, s.hydrated]);
   const Progress = () => <div className="flex gap-1.5">{[0, 1, 2, 3, 4, 5].map((k) => <div key={k} className="w-6 h-1 rounded-full" style={{ background: k <= step ? "#C8FF3D" : "#2A2D38" }} />)}</div>;
-  const H = ({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) => <><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase">{eyebrow}</div><div className="display text-[36px] mt-2.5 leading-[1.05]">{title}</div>{sub && <div className="text-[14px] text-muted mt-2.5 leading-[1.45]">{sub}</div>}</>;
-  const Next = ({ label = "Continue", onClick }: { label?: string; onClick?: () => void }) => <button onClick={onClick ?? (() => setStep(step + 1))} className="mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">{label}</button>;
+  const H = ({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) => <><div className="t-micro text-muted">{eyebrow}</div><div className="display t-h1 mt-2.5">{title}</div>{sub && <div className="t-body text-muted mt-2.5">{sub}</div>}</>;
+  const Next = ({ label = "Continue", onClick }: { label?: string; onClick?: () => void }) => <button onClick={onClick ?? (() => setStep(step + 1))} className="press mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">{label}</button>;
   const plMoves = [{ k: "pushups", name: "Push-ups, any kind", unit: "reps", hint: "Wall, knee, or full. Whatever you've got." }, { k: "squats", name: "Squats", unit: "reps", hint: "To a chair if you like." }, { k: "plank", name: "Plank hold", unit: "seconds", hint: "Forearms down. Stop when it stops being a plank." }] as const;
 
   if (!ready) return <div className="screen" />;
   return (
     <div className="screen px-6 safe-top pt-10">
-      <div className="flex items-center justify-between"><div className="display text-[22px]">uvu<span className="text-lime">.</span></div><Progress /></div>
+      <div className="flex items-center justify-between"><div className="display text-[22px]" style={{ letterSpacing: "-0.05em" }}>uvu<span className="text-lime">.</span></div><Progress /></div>
 
       {step === 0 && <div className="a-rise flex flex-col flex-1 pt-10">
-        <H eyebrow="1 of 3 · no account needed yet" title="How often do you move right now?" sub="Honest answer. There's no wrong one and nobody sees it." />
+        <div className="t-micro text-lime">You vs. you</div>
+        <div className="display t-h1 mt-2.5">Five minutes a day. Beat the person you were yesterday.</div>
+        <div className="t-body text-muted mt-2.5">No account yet. Three questions, one tiny test, and you have a number to beat tomorrow.</div>
+        <div className="t-micro text-muted mt-8">1 of 3 · How often do you move right now?</div>
         <div className="flex flex-col gap-2.5 mt-7">
           {[["never", "Basically never", "And I've quit apps before"], ["some", "Sometimes", "A good week has two or three"], ["most", "Most days", "I just want it to stick"]].map(([k, a, b]) => (
             <button key={k} onClick={() => setFreq(k)} className={`${OPT(freq === k)} h-16`}><span><span className="font-bold text-[16px] block">{a}</span><span className="text-[12px] text-muted">{b}</span></span><span className={`w-6 h-6 rounded-full flex items-center justify-center ${freq === k ? "bg-lime" : "border-2 border-ink-4"}`}>{freq === k && <Icon.Check size={14} />}</span></button>
@@ -84,7 +87,7 @@ export default function Start() {
             <button key={k} onClick={() => setGoal(k)} className={`${OPT(goal === k)} h-[60px]`}><span className="font-bold text-[16px]">{a}</span><span className={`text-[13px] font-semibold ${goal === k ? "text-lime" : "text-muted"}`}>{b}</span></button>
           ))}
         </div>
-        <div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase mt-6">Where will you mostly train?</div>
+        <div className="t-micro text-muted mt-6">Where will you mostly train?</div>
         <div className="flex bg-ink-3 rounded-full p-1 mt-2.5">{(["home", "gym", "travel"] as const).map((k) => <button key={k} onClick={() => setEnv(k)} className={`flex-1 h-10 rounded-full font-bold text-[13px] capitalize ${env === k ? "bg-lime text-ink" : "text-muted"}`}>{k}</button>)}</div>
         <Next label="Find my starting level" />
       </div>}
@@ -99,21 +102,21 @@ export default function Start() {
           <button onClick={() => setPl({ ...pl, [plMoves[plI].k]: Math.max(0, pl[plMoves[plI].k] - (plMoves[plI].unit === "seconds" ? 5 : 1)) })} className="w-14 h-14 rounded-full bg-ink-4 text-[28px]">−</button>
           <button onClick={() => setPl({ ...pl, [plMoves[plI].k]: pl[plMoves[plI].k] + (plMoves[plI].unit === "seconds" ? 5 : 1) })} className="w-14 h-14 rounded-full bg-lime text-ink text-[28px]">+</button>
         </div>
-        <div className="text-[13px] text-muted mt-5 text-center leading-[1.4]">Do it, then tap in what you got. It sets a starting crown per track. It'll be easy. That's the point.</div>
+        <div className="t-small text-muted mt-5 text-center">Actually do it, then tap in what you got. This is the first line in your ledger. It'll be easy; that's the point.</div>
         <Next label={plI < 2 ? "Next move" : "See my starting level"} onClick={() => (plI < 2 ? setPlI(plI + 1) : setStep(4))} />
       </div>}
 
       {step === 4 && <div className="a-rise flex flex-col flex-1 pt-10">
         <H eyebrow="One more · optional" title="Who are you doing this for?" sub="Not a goal. A person, or a version of you. The mascot brings it up exactly twice: day 30 and day 100. Nobody else sees it." />
         <div className="flex flex-wrap gap-2 mt-6">{["My kids", "Future me", "My partner", "A parent who couldn't", "Someone else"].map((w) => <button key={w} onClick={() => setWho(w)} className={`h-10 px-3.5 rounded-full border-[1.5px] font-bold text-[13px] ${who === w ? "border-lime bg-lime/8" : "border-ink-4 bg-ink-3"}`}>{w}</button>)}</div>
-        <label htmlFor="why" className="text-[12px] font-bold text-muted tracking-[1px] uppercase mt-6 block">In your words (optional)</label>
+        <label htmlFor="why" className="t-micro text-muted mt-6 block">In your words (optional)</label>
         <input id="why" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. so I can carry Eli up the stairs at 50" className="mt-2 w-full h-14 rounded-2xl border-[1.5px] border-ink-4 bg-ink-3 px-4 text-[15px] outline-none focus:border-lime" />
         <Next label="Save and continue" />
       </div>}
 
       {step === 5 && <div className="a-rise flex flex-col flex-1 pt-8">
-        <div className="text-[12px] font-bold text-lime tracking-[1.5px] uppercase">Day 1 · +60 XP earned</div>
-        <div className="display text-[36px] mt-2.5 leading-[1.05]">That's day one.<br />Tomorrow, beat it.</div>
+        <div className="t-micro text-lime">Day one · +60 XP</div>
+        <div className="display t-h1 mt-2.5">That's your first number.<br />Tomorrow, beat it.</div>
         <div className="grid grid-cols-3 gap-2 mt-5">
           {[["Push", pl.pushups >= 8 ? 3 : pl.pushups >= 5 ? 2 : 1], ["Legs", pl.squats >= 15 ? 3 : pl.squats >= 10 ? 2 : 1], ["Core", pl.plank >= 30 ? 3 : pl.plank >= 20 ? 2 : 1]].map(([t, l]) => <div key={t} className="bg-ink-3 rounded-[14px] p-3"><div className="text-[11px] text-muted font-bold">{t}</div><div className="display text-[22px] mt-0.5">Crown {l}</div></div>)}
         </div>
