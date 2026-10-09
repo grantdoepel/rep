@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { Vee, type Mood } from "./Vee";
 
 export function useMounted() { const [m, setM] = useState(false); useEffect(() => setM(true), []); return m; }
 
@@ -78,7 +79,7 @@ export function Ring({ value, size = 120, width = 10, color = "#C8FF3D", track =
 /** Seven-day pulse: the week drawn as one line. kinds: perfect | done | rest | frozen | missed | today | future */
 export function Pulse({ days, width = 320, height = 72 }: { days: { label: string; kind: string }[]; width?: number; height?: number }) {
   const n = days.length, pad = 14, step = (width - pad * 2) / (n - 1);
-  const y = (k: string) => (k === "perfect" ? 14 : k === "done" ? 22 : k === "rest" || k === "frozen" ? 34 : k === "today" ? 40 : 52);
+  const y = (k: string) => (k === "perfect" ? 12 : k === "done" ? 18 : k === "rest" || k === "frozen" ? 26 : k === "today" ? 30 : 36);
   const pts = days.map((d, i) => [pad + i * step, y(d.kind)] as const);
   const lastReal = days.reduce((a, d, i) => (["perfect", "done", "rest", "frozen", "missed"].includes(d.kind) ? i : a), -1);
   const path = pts.slice(0, Math.max(1, lastReal + 1)).map(([x, yy], i) => `${i ? "L" : "M"} ${x} ${yy}`).join(" ");
@@ -91,7 +92,7 @@ export function Pulse({ days, width = 320, height = 72 }: { days: { label: strin
         const fill = on ? "#C8FF3D" : k === "rest" || k === "frozen" ? "#8FB0FF" : k === "missed" ? "#2A2D38" : k === "today" ? "#0C0D11" : "transparent";
         return (
           <g key={i}>
-            {k === "today" && <circle cx={x} cy={yy} r="9" fill="none" stroke="#C8FF3D" strokeWidth="2.5" className="a-ring" />}
+            {k === "today" && <circle cx={x} cy={yy} r="10" fill="none" stroke="#C8FF3D" strokeWidth="2" className="a-ring" style={{ transformBox: "fill-box", transformOrigin: "center" }} />}
             <circle cx={x} cy={yy} r={k === "future" ? 4 : 6} fill={fill} stroke={k === "future" ? "#2A2D38" : k === "today" ? "#C8FF3D" : "none"} strokeWidth="2" />
             <text x={x} y={height - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={k === "today" ? "#F4F5F7" : "#7D8494"}>{days[i].label}</text>
           </g>
@@ -102,11 +103,11 @@ export function Pulse({ days, width = 320, height = 72 }: { days: { label: strin
 }
 
 /** The voice. A line, not a character, until there is real illustration. */
-export function Mascot({ line }: { line: string; mood?: "neutral" | "worried" | "happy" }) {
+export function Mascot({ line, mood = "neutral" }: { line: string; mood?: Mood }) {
   return (
     <div className="flex gap-3 items-start">
-      <div className="w-7 h-7 rounded-full bg-coral shrink-0 mt-0.5 flex items-center justify-center"><Mark height={9} color="#0C0D11" accent="#0C0D11" /></div>
-      <div className="t-body text-text-2">{line}</div>
+      <Vee size={40} mood={mood} className="shrink-0 -mt-1" />
+      <div className="t-body text-text-2 pt-1">{line}</div>
     </div>
   );
 }

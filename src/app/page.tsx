@@ -74,7 +74,7 @@ export default function Home() {
             {s.streak.freezes > 0 && <div className="t-small text-muted-2 font-semibold">{s.streak.freezes} freeze{s.streak.freezes === 1 ? "" : "s"} banked</div>}
           </div>
         </div>
-        <div className="mt-3"><Pulse days={week} width={340} height={72} /></div>
+        <div className="mt-2"><Pulse days={week} width={340} height={56} /></div>
       </section>
 
       {/* today's set: the one surface on the screen */}
@@ -119,7 +119,7 @@ export default function Home() {
       {atGym && !doneToday && <div className="mx-6 mt-3 flex items-center gap-3 t-small"><div className="w-2 h-2 rounded-full bg-lime a-blink" /><span className="font-bold">You're at {s.profile.gymName}.</span><span className="text-muted">Start, then grab a proof shot.</span></div>}
       {atGym && doneToday && <div className="mx-6 mt-3 text-ink"><div className="bg-lime rounded-[18px] px-4 py-3.5"><div className="font-extrabold text-[14px] mb-2">Still at {s.profile.gymName}? Proof shot time.</div><ProofShot /></div></div>}
 
-      <div className="mx-6 mt-5"><Mascot line={line} /></div>
+      <div className="mx-6 mt-5"><Mascot line={line} mood={atRisk ? "worried" : doneToday ? "proud" : hour >= 21 ? "sleepy" : isRest ? "sleepy" : "neutral"} /></div>
       {s.adaptiveNote && !doneToday && <div className="mx-6 mt-3 t-small text-muted">{s.adaptiveNote}</div>}
 
       <Section title={placement ? "Placement week" : `${tierName} league`} right={<Link href="/league" className="t-small font-bold text-lime press py-2.5 pl-3 -my-2.5">See board</Link>} className="mt-6">

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Environment, GoalTier } from "@/lib/types";
 import { Icon, Mascot } from "@/components/ui";
+import { Vee } from "@/components/Vee";
 import { supabaseEnabled, sync } from "@/lib/supabase";
 
 const OPT = (on: boolean) => `text-left rounded-[18px] border-[1.5px] px-[18px] flex items-center justify-between w-full ${on ? "border-lime bg-lime/8" : "border-ink-4 bg-ink-3"}`;
@@ -60,7 +61,7 @@ export default function Start() {
       <div className="flex items-center justify-between"><div className="display text-[22px]" style={{ letterSpacing: "-0.05em" }}>uvu<span className="text-lime">.</span></div><Progress /></div>
 
       {step === 0 && <div className="a-rise flex flex-col flex-1 pt-10">
-        <div className="t-micro text-lime">You vs. you</div>
+        <div className="flex items-end justify-between"><div className="t-micro text-lime">You vs. you</div><Vee size={64} mood="happy" bob /></div>
         <div className="display t-h1 mt-2.5">Five minutes a day. Beat the person you were yesterday.</div>
         <div className="t-body text-muted mt-2.5">No account yet. Three questions, one tiny test, and you have a number to beat tomorrow.</div>
         <div className="t-micro text-muted mt-8">1 of 3 · How often do you move right now?</div>
@@ -120,7 +121,7 @@ export default function Start() {
         <div className="grid grid-cols-3 gap-2 mt-5">
           {[["Push", pl.pushups >= 8 ? 3 : pl.pushups >= 5 ? 2 : 1], ["Legs", pl.squats >= 15 ? 3 : pl.squats >= 10 ? 2 : 1], ["Core", pl.plank >= 30 ? 3 : pl.plank >= 20 ? 2 : 1]].map(([t, l]) => <div key={t} className="bg-ink-3 rounded-[14px] p-3"><div className="text-[11px] text-muted font-bold">{t}</div><div className="display text-[22px] mt-0.5">Crown {l}</div></div>)}
         </div>
-        <div className="mt-3.5"><Mascot line="Save this so I can bother you tomorrow. Respectfully." /></div>
+        <div className="mt-3.5"><Mascot line="Save this so I can bother you tomorrow. Respectfully." mood="proud" /></div>
         {supabaseEnabled && user ? (
           <div className="mt-5 flex items-center gap-3 bg-ink-3 rounded-2xl px-4 py-3.5"><span className="w-6 h-6 rounded-full bg-lime flex items-center justify-center"><Icon.Check size={14} /></span><div className="text-[14px]"><span className="font-bold">Signed in</span><span className="text-muted"> as {user.email ?? user.name}</span></div></div>
         ) : supabaseEnabled ? (

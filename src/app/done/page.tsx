@@ -4,7 +4,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { MOVEMENT_BY_ID, TRACKS } from "@/lib/content";
-import { Avatar, Confetti, CountUp, Icon, Mark } from "@/components/ui";
+import { Avatar, Confetti, CountUp, Icon } from "@/components/ui";
+import { Vee } from "@/components/Vee";
 import { ProofShot } from "@/components/ProofShot";
 import { Reminders } from "@/components/Reminders";
 
@@ -35,7 +36,7 @@ function DoneInner() {
       <div className="safe-top px-6 pt-10">
         <div className="flex items-center justify-between">
           <div className="t-micro opacity-65">{s.lastDone?.kind === "rescue" ? "Streak saved" : s.lastDone?.kind === "rest" ? "Rest day kept" : "Set complete"}</div>
-          <Mark height={18} color="#0C0D11" accent="#0C0D11" draw />
+          <Vee size={56} mood={effort === 0 ? "worried" : perfect || beats > 0 ? "proud" : "happy"} bob className="-mt-3 -mr-1" />
         </div>
         <div className="display mt-5 flex items-baseline gap-2" style={{ fontSize: 96, letterSpacing: "-0.06em", lineHeight: 1 }}>
           <span>+<CountUp to={xp} /></span><span className="t-h2 display opacity-60">XP</span>

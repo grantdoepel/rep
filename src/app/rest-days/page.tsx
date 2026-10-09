@@ -34,7 +34,7 @@ export default function RestDays() {
       <div className="flex justify-between px-6 pt-5">{[1, 2, 3, 4, 5, 6, 0].map((d) => { const on = days.includes(d); return <button key={d} onClick={() => toggle(d)} className={`w-[42px] h-14 rounded-[14px] font-extrabold text-[14px] flex flex-col items-center justify-center gap-1 ${on ? "bg-blue text-text" : "bg-ink-3 text-muted"}`}>{DAYS[d][0]}<span className="w-1.5 h-1.5 rounded-full" style={{ background: on ? "#F4F5F7" : "transparent" }} /></button>; })}</div>
       <div className="text-[12px] text-muted px-6 pt-2.5 font-semibold">{days.length === 0 ? "No rest days. The mascot will have opinions about this." : days.length === 1 ? `One rest day: ${picked[0]}. You can add one more.` : `Two rest days: ${picked.join(" and ")}. That's the max.`}</div>
 
-      <div className="mx-6 mt-5"><Mascot line="Rest day. I mean it. Three minutes of stretching and then go sit down. You earned the sitting." /></div>
+      <div className="mx-6 mt-5"><Mascot line="Rest day. I mean it. Three minutes of stretching and then go sit down. You earned the sitting." mood="sleepy" /></div>
 
       <div className="px-6 pt-6"><div className="t-micro text-muted">Daily goal</div>
         <div className="flex bg-ink-3 rounded-full p-1 mt-2.5">{(["casual", "regular", "serious"] as const).map((k) => <button key={k} onClick={() => setGoal(k)} className={`flex-1 h-10 rounded-full font-bold text-[13px] capitalize ${goal === k ? "bg-lime text-ink" : "text-muted"}`}>{k}</button>)}</div></div>
