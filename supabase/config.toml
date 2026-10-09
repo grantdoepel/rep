@@ -1,0 +1,5 @@
+project_id = "rep"
+[functions.complete_set]
+verify_jwt = true
+[functions.notify]
+verify_jwt = false
