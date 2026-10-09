@@ -22,14 +22,39 @@ export default function Start() {
   const [who, setWho] = useState("Future me");
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<{ id: string; email?: string; name?: string } | null>(null);
   useEffect(() => { if (s.hydrated && s.onboarded) router.replace("/"); }, [s.hydrated, s.onboarded, router]);
 
-  const finish = () => { s.completeOnboarding({ goalTier: goal, environment: env, whyText: why || undefined, whyWho: who, displayName: "You", username: "you" }, pl); router.replace("/"); };
+  // Onboarding answers survive the OAuth / magic-link round trip (the page fully reloads on return).
+  const DRAFT = "rep.onboarding";
+  useEffect(() => {
+    try { const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null"); if (d) { setStep(d.step ?? 0); setFreq(d.freq ?? "some"); setHard(d.hard ?? ["time", "consistent"]); setGoal(d.goal ?? "regular"); setEnv(d.env ?? "home"); setPl(d.pl ?? { pushups: 6, squats: 12, plank: 20 }); setPlI(d.plI ?? 0); setWhy(d.why ?? ""); setWho(d.who ?? "Future me"); } } catch {}
+    setReady(true);
+  }, []);
+  useEffect(() => { if (!ready) return; try { localStorage.setItem(DRAFT, JSON.stringify({ step, freq, hard, goal, env, pl, plI, why, who })); } catch {} }, [ready, step, freq, hard, goal, env, pl, plI, why, who]);
+
+  const finish = (u = user) => {
+    const name = u?.name?.trim() || u?.email?.split("@")[0] || "You";
+    s.completeOnboarding({ goalTier: goal, environment: env, whyText: why || undefined, whyWho: who, displayName: name, username: (u?.email?.split("@")[0] ?? "you").toLowerCase().replace(/[^a-z0-9_]/g, "") || "you" }, pl);
+    try { localStorage.removeItem(DRAFT); } catch {}
+    router.replace("/");
+  };
+
+  // Already signed in (e.g. just came back from Google): show it, and if the answers were all in, finish without asking again.
+  useEffect(() => {
+    if (!ready || !supabaseEnabled) return;
+    let alive = true;
+    sync.currentUser().then((u) => { if (!alive || !u) return; setUser(u); if (step === 5 && s.hydrated && !s.onboarded) finish(u); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, step, s.hydrated]);
   const Progress = () => <div className="flex gap-1.5">{[0, 1, 2, 3, 4, 5].map((k) => <div key={k} className="w-6 h-1 rounded-full" style={{ background: k <= step ? "#C8FF3D" : "#2A2D38" }} />)}</div>;
   const H = ({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) => <><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase">{eyebrow}</div><div className="display text-[36px] mt-2.5 leading-[1.05]">{title}</div>{sub && <div className="text-[14px] text-muted mt-2.5 leading-[1.45]">{sub}</div>}</>;
   const Next = ({ label = "Continue", onClick }: { label?: string; onClick?: () => void }) => <button onClick={onClick ?? (() => setStep(step + 1))} className="mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">{label}</button>;
   const plMoves = [{ k: "pushups", name: "Push-ups, any kind", unit: "reps", hint: "Wall, knee, or full. Whatever you've got." }, { k: "squats", name: "Squats", unit: "reps", hint: "To a chair if you like." }, { k: "plank", name: "Plank hold", unit: "seconds", hint: "Forearms down. Stop when it stops being a plank." }] as const;
 
+  if (!ready) return <div className="screen" />;
   return (
     <div className="screen px-6 safe-top pt-10">
       <div className="flex items-center justify-between"><div className="display text-[22px]">rep<span className="text-lime">.</span></div><Progress /></div>
@@ -93,7 +118,9 @@ export default function Start() {
           {[["Push", pl.pushups >= 8 ? 3 : pl.pushups >= 5 ? 2 : 1], ["Legs", pl.squats >= 15 ? 3 : pl.squats >= 10 ? 2 : 1], ["Core", pl.plank >= 30 ? 3 : pl.plank >= 20 ? 2 : 1]].map(([t, l]) => <div key={t} className="bg-ink-3 rounded-[14px] p-3"><div className="text-[11px] text-muted font-bold">{t}</div><div className="display text-[22px] mt-0.5">Crown {l}</div></div>)}
         </div>
         <div className="mt-3.5"><Mascot line="Save this so I can bother you tomorrow. Respectfully." /></div>
-        {supabaseEnabled ? (
+        {supabaseEnabled && user ? (
+          <div className="mt-5 flex items-center gap-3 bg-ink-3 rounded-2xl px-4 py-3.5"><span className="w-6 h-6 rounded-full bg-lime flex items-center justify-center"><Icon.Check size={14} /></span><div className="text-[14px]"><span className="font-bold">Signed in</span><span className="text-muted"> as {user.email ?? user.name}</span></div></div>
+        ) : supabaseEnabled ? (
           <div className="mt-5 flex flex-col gap-2.5">
             <button onClick={() => sync.signInWithOAuth("apple")} className="h-[54px] rounded-2xl bg-text text-ink font-bold text-[15px]">Continue with Apple</button>
             <button onClick={() => sync.signInWithOAuth("google")} className="h-[54px] rounded-2xl border-[1.5px] border-ink-4 font-bold text-[15px]">Continue with Google</button>
@@ -102,7 +129,7 @@ export default function Start() {
         ) : (
           <div className="mt-5 text-[13px] text-muted bg-ink-2 rounded-xl px-3.5 py-3 leading-[1.4]">Accounts arrive with the backend. For now your Rep lives on this device.</div>
         )}
-        <button onClick={finish} className="mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">Start my Rep</button>
+        <button onClick={() => finish()} className="mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">Start my Rep</button>
       </div>}
     </div>
   );

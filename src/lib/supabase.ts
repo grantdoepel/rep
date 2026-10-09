@@ -23,6 +23,13 @@ async function userId(): Promise<string | null> {
 
 // Fire-and-forget sync. The app is local-first; these keep the server in step when configured.
 export const sync = {
+  async currentUser(): Promise<{ id: string; email?: string; name?: string } | null> {
+    const sb = supabase(); if (!sb) return null;
+    const { data } = await sb.auth.getUser();
+    const u = data.user; if (!u) return null;
+    const m = (u.user_metadata ?? {}) as Record<string, unknown>;
+    return { id: u.id, email: u.email ?? undefined, name: (m.full_name as string) || (m.name as string) || undefined };
+  },
   async profile(p: Profile) {
     const sb = supabase(); const uid = await userId(); if (!sb || !uid) return;
     await sb.from("profiles").upsert({ id: uid, username: p.username, display_name: p.displayName, goal_tier: p.goalTier, environment: p.environment, difficulty_tier: p.tier, timezone: p.timezone, rest_days: p.restDays, injury_flags: p.injuryFlags, accessibility_flags: p.accessibility, why_text: p.whyText ?? null, why_who: p.whyWho ?? null });
