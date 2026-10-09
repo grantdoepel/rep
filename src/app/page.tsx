@@ -46,7 +46,7 @@ export default function Home() {
   return (
     <div className="screen">
       <header className="safe-top px-6 pt-10 flex items-center justify-between">
-        <div className="display text-[26px]">rep<span className="text-lime">.</span></div>
+        <div className="display text-[26px]">uvu<span className="text-lime">.</span></div>
         <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-1.5 bg-ink-3 rounded-full py-2 pl-2.5 pr-3"><Icon.Gem /><span className="font-bold text-[14px]">{s.gems}</span></div>
           <Link href="/profile"><Avatar initials={s.profile.displayName.slice(0, 2).toUpperCase()} color="#2A2D38" fg="#C8FF3D" size={40} /></Link>

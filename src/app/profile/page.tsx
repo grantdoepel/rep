@@ -21,7 +21,7 @@ export default function Profile() {
   const days = s.log.filter((l) => l.kind !== "missed").length;
   const crowns = TRACKS.reduce((a, t) => a + ((s.crowns[t.id]?.level ?? 1) - 1), 0);
   const ms = [7, 30, 100, 365];
-  const share = () => navigator.share?.({ title: "Rep", text: `${s.streak.current} days in a row. Keeping my Rep.`, url: location.origin }).catch(() => {});
+  const share = () => navigator.share?.({ title: "uvu", text: `${s.streak.current} days in a row. You vs. you.`, url: location.origin }).catch(() => {});
 
   return (
     <div className="screen">

@@ -57,7 +57,7 @@ export default function Start() {
   if (!ready) return <div className="screen" />;
   return (
     <div className="screen px-6 safe-top pt-10">
-      <div className="flex items-center justify-between"><div className="display text-[22px]">rep<span className="text-lime">.</span></div><Progress /></div>
+      <div className="flex items-center justify-between"><div className="display text-[22px]">uvu<span className="text-lime">.</span></div><Progress /></div>
 
       {step === 0 && <div className="a-rise flex flex-col flex-1 pt-10">
         <H eyebrow="1 of 3 · no account needed yet" title="How often do you move right now?" sub="Honest answer. There's no wrong one and nobody sees it." />

@@ -28,7 +28,7 @@ export default function Friends() {
     <div className="screen">
       <div className="safe-top px-6 pt-10 flex items-end justify-between">
         <div><div className="display text-[30px]">Friends</div><div className="text-[13px] text-muted mt-1.5 font-medium">{s.friends.filter((f) => f.doneToday).length} keeping their Rep today</div></div>
-        <button aria-label="Add friend" onClick={() => navigator.share?.({ title: "Rep", text: "Keep your Rep with me.", url: location.origin + "/?ref=" + s.profile.username }).catch(() => {})} className="w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+        <button aria-label="Add friend" onClick={() => navigator.share?.({ title: "uvu", text: "Be my Duo on uvu.", url: location.origin + "/?ref=" + s.profile.username }).catch(() => {})} className="w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
       </div>
 
       {moving.length > 0 && (

@@ -33,7 +33,7 @@
   --color-sky: var(--sky);
   --color-amber: var(--amber);
   --font-sans: var(--font-dm), system-ui, sans-serif;
-  --font-display: var(--font-bricolage), var(--font-dm), sans-serif;
+  --font-display: var(--font-outfit), var(--font-dm), sans-serif;
 }
 
 @layer base {
@@ -51,7 +51,7 @@
   * { -webkit-tap-highlight-color: transparent; }
 }
 
-.display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
 
 @keyframes pulse-ring { 0%,100%{transform:scale(1);opacity:.55} 50%{transform:scale(1.06);opacity:.2} }
 @keyframes flicker { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-1px) scale(1.05)} }

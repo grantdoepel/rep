@@ -1,4 +1,4 @@
-# Rep
+# uvu — you vs. you
 
 Keep your Rep. A Duolingo-style fitness habit game: five minutes a day, a streak worth protecting, friends who notice.
 
