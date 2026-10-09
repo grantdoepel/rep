@@ -1,14 +1,17 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { dayOfWeek, localDate } from "@/lib/rules";
+import { addDays, dayOfWeek, localDate } from "@/lib/rules";
 import { Avatar, Icon, TabBar, useMounted } from "@/components/ui";
 
 export default function Friends() {
   const s = useStore();
   const mounted = useMounted();
   const router = useRouter();
+  const [wagerDraft, setWagerDraft] = useState("");
+  const [editWager, setEditWager] = useState(false);
   if (!mounted) return <div className="screen" />;
   const today = localDate(new Date(), s.profile.timezone);
   const daysLeft = 7 - ((dayOfWeek(today) + 6) % 7);
@@ -16,6 +19,10 @@ export default function Friends() {
   const duo = s.duo;
   const partner = s.friends.find((f) => f.id === duo?.partnerId);
   const you = (duo?.yourXp ?? 0), them = duo?.partnerXp ?? 0, tgt = duo?.targetXp ?? 2000;
+  const yesterday = addDays(today, -1);
+  const missedYesterday = !s.log.some((l) => l.date === yesterday && l.kind !== "missed") && yesterday >= s.profile.createdAt.slice(0, 10) && s.log.length > 0;
+  const pendingPinky = s.pinkyPromises.find((p) => p.date === yesterday);
+  const shots = s.proofShots;
 
   return (
     <div className="screen">
@@ -45,6 +52,42 @@ export default function Friends() {
             </div>
             <div className="flex flex-col items-center gap-1.5"><Avatar initials={(partner?.displayName ?? duo.partnerName).slice(0, 2).toUpperCase()} color={partner?.color ?? "#3D4EFF"} size={52} /><span className="text-[11px] font-bold">{duo.partnerName} · {them}</span></div>
           </div>
+          <div className="mt-3.5 pt-3.5 border-t border-ink-4">
+            <div className="flex items-center justify-between"><div className="text-[11px] font-bold text-muted tracking-[1px] uppercase">The wager</div><button onClick={() => { setWagerDraft(duo.wagerYou ?? ""); setEditWager(!editWager); }} className="text-[12px] font-bold text-lime">{duo.wagerYou ? "Edit" : "Set yours"}</button></div>
+            {editWager ? (
+              <div className="flex gap-2 mt-2"><input value={wagerDraft} onChange={(e) => setWagerDraft(e.target.value)} placeholder="If we miss, I owe…" className="flex-1 h-11 rounded-xl bg-ink border-[1.5px] border-ink-4 px-3.5 text-[14px] outline-none focus:border-lime" /><button onClick={() => { s.setWager(wagerDraft.trim()); setEditWager(false); }} className="h-11 px-4 rounded-xl bg-lime text-ink font-extrabold text-[13px]">Save</button></div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="bg-ink rounded-xl px-3 py-2.5"><div className="text-[10px] font-bold text-muted">You owe</div><div className="text-[13px] font-bold mt-0.5">{duo.wagerYou ?? <span className="text-muted-2">Not set yet</span>}</div></div>
+                <div className="bg-ink rounded-xl px-3 py-2.5"><div className="text-[10px] font-bold text-muted">{duo.partnerName} owes</div><div className="text-[13px] font-bold mt-0.5">{duo.wagerPartner ?? <span className="text-muted-2">Not set yet</span>}</div></div>
+              </div>
+            )}
+            <div className="text-[11px] text-muted mt-2">Miss the quest and Monday's card says who pays. Keep it small. Keep it funny.</div>
+          </div>
+        </div>
+      )}
+
+      {missedYesterday && duo && (
+        <div className="mx-6 mt-3.5 bg-ink-3 rounded-[18px] px-4 py-3.5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-coral flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4a2 2 0 0 1 4 0v8M10 6a2 2 0 0 1 4 0v6M6 9a2 2 0 0 1 4 0v3M18 12v3a6 6 0 0 1-12 0v-2" /></svg></div>
+            <div className="flex-1"><div className="font-bold text-[14px]">Forgot to log yesterday?</div><div className="text-[12px] text-muted">Pinky Promise: {duo.partnerName} decides if it counts. {2 - s.pinkyUsedThisMonth} left this month.</div></div>
+          </div>
+          {pendingPinky ? (
+            <div className="mt-3 flex items-center justify-between bg-ink rounded-xl px-3.5 py-2.5 text-[13px]">
+              <span className={pendingPinky.status === "vouched" ? "text-lime font-bold" : pendingPinky.status === "declined" ? "text-coral font-bold" : "text-muted font-semibold"}>{pendingPinky.status === "pending" ? `Waiting on ${pendingPinky.voucherName}…` : pendingPinky.status === "vouched" ? `${pendingPinky.voucherName} vouched. Day counted.` : `${pendingPinky.voucherName} said no. Fair.`}</span>
+              {pendingPinky.status === "pending" && <div className="flex gap-1.5"><button onClick={() => s.resolvePinky(pendingPinky.id, true)} className="text-[11px] font-bold bg-lime text-ink rounded-full px-2.5 py-1">Demo: yes</button><button onClick={() => s.resolvePinky(pendingPinky.id, false)} className="text-[11px] font-bold bg-ink-4 rounded-full px-2.5 py-1">no</button></div>}
+            </div>
+          ) : (
+            <button onClick={() => s.requestPinky(yesterday)} disabled={s.pinkyUsedThisMonth >= 2} className="mt-3 w-full h-11 rounded-xl bg-coral text-ink font-extrabold text-[14px] disabled:opacity-40">Ask {duo.partnerName} to vouch</button>
+          )}
+        </div>
+      )}
+
+      {shots.length > 0 && (
+        <div className="px-6 pt-4">
+          <div className="text-[11px] font-bold text-muted tracking-[1px] uppercase pb-2">Proof shots · last 24h</div>
+          <div className="flex gap-2 overflow-x-auto pb-1">{shots.map((p) => <div key={p.id} className="relative shrink-0 w-[96px] aspect-[3/4] rounded-xl overflow-hidden"><img src={p.dataUrl} alt="Proof shot" className="w-full h-full object-cover" /><div className="absolute left-1.5 bottom-1.5 text-[10px] font-bold bg-ink/70 rounded-full px-2 py-0.5">You</div></div>)}</div>
         </div>
       )}
 

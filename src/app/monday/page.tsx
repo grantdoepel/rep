@@ -32,6 +32,15 @@ export default function Monday() {
         <div className="bg-ink-3 rounded-[18px] px-3 py-3.5"><div className="display text-[26px]">{Math.min(7, s.log.filter((l) => l.kind !== "missed").slice(-7).length)}<span className="text-[14px] text-muted">/7</span></div><div className="text-[11px] text-muted font-semibold mt-0.5">days moved</div></div>
         <div className="bg-ink-3 rounded-[18px] px-3 py-3.5"><div className="display text-[26px] text-lime">{s.streak.current}</div><div className="text-[11px] text-muted font-semibold mt-0.5">streak</div></div>
       </div>
+      {s.duo && !duoCleared && (s.duo.wagerYou || s.duo.wagerPartner) && <div className="a-rise d4 mx-6 mt-3 bg-coral/12 border-[1.5px] border-coral rounded-[18px] px-4 py-3.5"><div className="text-[11px] font-bold text-coral tracking-[1.5px] uppercase">The wager</div><div className="font-bold text-[14px] mt-1">{s.duo.yourXp < s.duo.partnerXp ? `You owe ${s.duo.partnerName}: ${s.duo.wagerYou ?? "whatever you agreed"}` : `${s.duo.partnerName} owes you: ${s.duo.wagerPartner ?? "whatever you agreed"}`}</div><div className="text-[12px] text-muted mt-1">Lower XP pays. Settle it this week; the mascot will ask.</div></div>}
+      <div className="a-rise d4 mx-6 mt-3">
+        <div className="text-[11px] font-bold text-muted tracking-[1px] uppercase mb-2">Crew awards · Tuesday Crew</div>
+        <div className="grid grid-cols-3 gap-2">
+          {[{ n: "Earliest Bird", w: "Priya", b: "5 Sets before 7am" }, { n: "Rescue Artist", w: "You", b: "2 Rescue Sets, 0 misses" }, { n: "Perfect Week", w: "Sam", b: "7 for 7, all targets" }].map((a) => (
+            <div key={a.n} className={`rounded-2xl p-3 ${a.w === "You" ? "bg-lime text-ink" : "bg-ink-3"}`}><div className="text-[10px] font-bold uppercase tracking-[1px] opacity-70">{a.n}</div><div className="display text-[16px] mt-1">{a.w}</div><div className={`text-[10px] mt-1 ${a.w === "You" ? "opacity-70" : "text-muted"}`}>{a.b}</div></div>
+          ))}
+        </div>
+      </div>
       {s.duo && <div className="a-rise d4 mx-6 mt-3 bg-ink-3 rounded-[18px] px-4 py-3.5 flex items-center gap-3"><div className="flex"><div className="w-[30px] h-[30px] rounded-full bg-lime border-2 border-ink-3 box-border" /><div className="w-[30px] h-[30px] rounded-full bg-blue border-2 border-ink-3 box-border -ml-2.5" /></div><div className="flex-1"><div className="font-bold text-[14px]">Duo Quest with {s.duo.partnerName}: {duoCleared ? "cleared" : "not this time"}</div><div className="text-[12px] text-muted font-semibold">{(s.duo.yourXp + s.duo.partnerXp).toLocaleString()} of {s.duo.targetXp.toLocaleString()} XP{duoCleared ? " · 200 gems each" : ""}</div></div>{duoCleared && <Icon.Check size={22} color="#C8FF3D" />}</div>}
       <div className="mt-auto px-6 pb-8 safe-bottom pt-5"><button onClick={go} className="h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">See the new league</button></div>
     </div>

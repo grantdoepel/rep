@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { useStore } from "@/lib/store";
 import { TRACKS } from "@/lib/content";
 import { Avatar, Confetti, Icon } from "@/components/ui";
+import { ProofShot } from "@/components/ProofShot";
 
 function DoneInner() {
   const s = useStore();
@@ -38,6 +39,8 @@ function DoneInner() {
       ) : c && (
         <div className="a-rise d3 mx-6 mt-3.5 bg-ink/8 rounded-[18px] px-4 py-3.5 flex items-center gap-3.5"><Icon.Crown size={40} color="#0C0D11" /><div><div className="font-extrabold text-[15px]">{3 - c.clears} more clear{3 - c.clears === 1 ? "" : "s"} for {TRACKS.find((t) => t.id === track)?.name} Crown {c.level + 1}</div><div className="text-[13px] opacity-70 mt-0.5">On different days. Tomorrow works.</div></div></div>
       )}
+
+      <div className="a-rise d3 mx-6 mt-3.5"><ProofShot /></div>
 
       {atRisk && (
         <div className="a-rise d4 mx-6 mt-3.5 bg-ink text-text rounded-[22px] p-4">

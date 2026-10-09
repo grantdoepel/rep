@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { TRACKS } from "@/lib/content";
 import { addDays, localDate, weekStart } from "@/lib/rules";
@@ -10,6 +11,9 @@ const CELL: Record<string, string> = { perfect: "#C8FF3D", done: "#6E8A1F", rest
 export default function Profile() {
   const s = useStore();
   const mounted = useMounted();
+  const [treatOpen, setTreatOpen] = useState(false);
+  const [treatText, setTreatText] = useState("");
+  const [treatMs, setTreatMs] = useState(30);
   if (!mounted) return <div className="screen" />;
   const today = localDate(new Date(), s.profile.timezone);
   const start = addDays(weekStart(today), -63);
@@ -49,6 +53,24 @@ export default function Profile() {
       </div>
 
       {s.profile.whyText && <div className="mx-6 mt-4 bg-ink-2 rounded-2xl px-4 py-3 text-[13px] leading-[1.4]"><span className="text-muted font-semibold">Your why · </span><span className="display font-bold text-[14px] text-lime italic">"{s.profile.whyText}"</span></div>}
+
+      <div className="mx-6 mt-3 bg-ink-3 rounded-2xl px-4 py-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB347" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12v8H4v-8M2 7h20v5H2zM12 7v13M12 7c-2-4-6-4-6-1s4 1 6 1M12 7c2-4 6-4 6-1s-4 1-6 1" /></svg><div className="font-bold text-[14px]">Treat yourself</div></div>
+          <button onClick={() => { setTreatText(s.profile.treatText ?? ""); setTreatMs(s.profile.treatMilestone ?? 30); setTreatOpen(!treatOpen); }} className="text-[12px] font-bold text-lime">{s.profile.treatText ? "Edit" : "Set one"}</button>
+        </div>
+        {treatOpen ? (
+          <div className="mt-3 flex flex-col gap-2">
+            <input value={treatText} onChange={(e) => setTreatText(e.target.value)} placeholder="e.g. new running shoes" className="h-11 rounded-xl bg-ink border-[1.5px] border-ink-4 px-3.5 text-[14px] outline-none focus:border-lime" />
+            <div className="flex gap-1.5">{[7, 30, 100, 365].map((m) => <button key={m} onClick={() => setTreatMs(m)} className={`flex-1 h-9 rounded-full text-[12px] font-bold ${treatMs === m ? "bg-lime text-ink" : "bg-ink text-muted"}`}>{m} days</button>)}</div>
+            <button onClick={() => { s.setTreat(treatText.trim(), treatMs); setTreatOpen(false); }} className="h-11 rounded-xl bg-lime text-ink font-extrabold text-[14px]">Save</button>
+          </div>
+        ) : s.profile.treatText ? (
+          <div className="mt-2 text-[13px] leading-[1.4]"><span className="display text-[14px] text-amber">{s.profile.treatText}</span> <span className="text-muted">at {s.profile.treatMilestone} days · {s.streak.longest >= (s.profile.treatMilestone ?? 0) ? "earned. Go get it." : `${(s.profile.treatMilestone ?? 0) - s.streak.current} to go`}</span></div>
+        ) : (
+          <div className="mt-2 text-[12px] text-muted leading-[1.4]">A real-world reward you name now and claim at a streak milestone. The mascot gets an outfit; you get the thing.</div>
+        )}
+      </div>
 
       <div className="mt-auto px-6 pb-8 safe-bottom pt-5 flex flex-col gap-2.5">
         <button onClick={share} className="h-12 rounded-[14px] border-[1.5px] border-ink-4 font-bold text-[14px]">Share my {s.streak.current}-day card</button>

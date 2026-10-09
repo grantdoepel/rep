@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { Crowns, DailySet, DayLog, DuoQuest, Friend, LeagueRow, LeagueTier, Profile, SetMove, Streak, Track } from "./types";
+import type { CrewAward, Crowns, DailySet, DayLog, DuoQuest, Friend, LeagueRow, LeagueTier, PinkyPromise, Profile, ProofShot, SetMove, Streak, Track } from "./types";
 import { addDays, applyCrownProgress, countDay, generateSet, localDate, scoreSet, tierFromScore, weekStart } from "./rules";
 import { MOVEMENT_BY_ID } from "./content";
 import { sync } from "./supabase";
@@ -24,6 +24,10 @@ export interface State {
   duo?: DuoQuest;
   nudgedToday: string[];
   cheered: string[];
+  proofShots: ProofShot[];
+  pinkyPromises: PinkyPromise[];
+  pinkyUsedThisMonth: number;
+  awards: CrewAward[];
   adaptiveNote?: string;
   seenMonday?: string;
   seenMilestone?: number;
@@ -41,6 +45,12 @@ type Actions = {
   cheer: (friendId: string) => void;
   setDuo: (friendId: string) => void;
   markMondaySeen: () => void;
+  addProofShot: (dataUrl: string) => void;
+  setWager: (mine: string) => void;
+  requestPinky: (date: string) => PinkyPromise | null;
+  resolvePinky: (id: string, ok: boolean) => void;
+  setTreat: (text: string, milestone: number) => void;
+  setGym: (lat: number, lng: number, name: string) => void;
   reset: () => void;
 };
 
@@ -72,7 +82,7 @@ function initial(): State {
     hydrated: false, onboarded: false,
     profile: { id: "local", username: "you", displayName: "You", goalTier: "regular", environment: "home", tier: "standard", timezone: tz, restDays: [0], injuryFlags: [], accessibility: [], createdAt: "" },
     crowns: {}, streak: { current: 0, longest: 0, freezes: 2 }, gems: 0, xpTotal: 0, xpWeek: 0,
-    log: [], leagueTier: "bronze", league: seedLeague(0, friends), friends, nudgedToday: [], cheered: [],
+    log: [], leagueTier: "bronze", league: seedLeague(0, friends), friends, nudgedToday: [], cheered: [], proofShots: [], pinkyPromises: [], pinkyUsedThisMonth: 0, awards: [],
   };
 }
 
@@ -104,7 +114,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
         if (weekStart(today) !== weekStart(x.today?.date ?? today)) { next.xpWeek = 0; next.duo = undefined; }
       }
-      if (!next.duo) next.duo = { partnerId: "f_priya", partnerName: "Priya", targetXp: 2000, yourXp: next.xpWeek, partnerXp: 600, weekStart: weekStart(today), status: "active" };
+      if (!next.duo) next.duo = { partnerId: "f_priya", partnerName: "Priya", targetXp: 2000, yourXp: next.xpWeek, partnerXp: 600, weekStart: weekStart(today), status: "active", wagerPartner: "Loser buys coffee" };
+      next.proofShots = (next.proofShots ?? []).filter((p) => p.expiresAt > new Date().toISOString());
       return next;
     });
   }, [s.hydrated, s.onboarded, s.profile, s.crowns, s.today?.date]);
@@ -170,6 +181,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     cheer: (id) => set((x) => ({ ...x, cheered: x.cheered.includes(id) ? x.cheered.filter((c) => c !== id) : [...x.cheered, id] })),
     setDuo: (id) => set((x) => { const f = x.friends.find((f) => f.id === id); if (!f) return x; return { ...x, friends: x.friends.map((g) => ({ ...g, isDuo: g.id === id })), duo: { partnerId: id, partnerName: f.displayName.split(" ")[0], targetXp: 2000, yourXp: x.xpWeek, partnerXp: Math.round(f.xpWeek * 0.55), weekStart: weekStart(localDate()), status: "active" } }; }),
     markMondaySeen: () => set((x) => ({ ...x, seenMonday: weekStart(localDate(new Date(), x.profile.timezone)) })),
+    addProofShot: (dataUrl) => set((x) => { const today = localDate(new Date(), x.profile.timezone); const exp = new Date(Date.now() + 24 * 3600 * 1000).toISOString(); return { ...x, proofShots: [...x.proofShots.filter((p) => p.date !== today), { id: `ps_${Date.now()}`, date: today, dataUrl, setId: x.lastDone?.id ?? "", expiresAt: exp }] }; }),
+    setWager: (mine) => set((x) => (x.duo ? { ...x, duo: { ...x.duo, wagerYou: mine } } : x)),
+    requestPinky: (date) => {
+      let out: PinkyPromise | null = null;
+      set((x) => { if (x.pinkyUsedThisMonth >= 2 || !x.duo) return x; const partner = x.friends.find((f) => f.id === x.duo!.partnerId); out = { id: `pp_${Date.now()}`, date, voucherId: x.duo.partnerId, voucherName: partner?.displayName.split(" ")[0] ?? x.duo.partnerName, status: "pending" }; return { ...x, pinkyPromises: [...x.pinkyPromises, out], pinkyUsedThisMonth: x.pinkyUsedThisMonth + 1 }; });
+      return out;
+    },
+    resolvePinky: (id, ok) => set((x) => { const pp = x.pinkyPromises.find((p) => p.id === id); if (!pp) return x; const promises = x.pinkyPromises.map((p) => (p.id === id ? { ...p, status: ok ? "vouched" as const : "declined" as const } : p)); if (!ok) return { ...x, pinkyPromises: promises }; const streak = countDay(x.streak, pp.date); return { ...x, pinkyPromises: promises, streak, log: x.log.filter((l) => l.date !== pp.date).concat({ date: pp.date, kind: "done" }) }; }),
+    setTreat: (text, milestone) => set((x) => { const profile = { ...x.profile, treatText: text, treatMilestone: milestone }; sync.profile(profile); return { ...x, profile }; }),
+    setGym: (lat, lng, name) => set((x) => { const profile = { ...x.profile, gymLat: lat, gymLng: lng, gymName: name }; sync.profile(profile); return { ...x, profile }; }),
     reset: () => { try { localStorage.removeItem(KEY); } catch {} setS({ ...initial(), hydrated: true }); },
   }), [set]);
 

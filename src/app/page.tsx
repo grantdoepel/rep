@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ProofShot } from "@/components/ProofShot";
 import { useStore } from "@/lib/store";
 import { MOVEMENT_BY_ID, TRACKS } from "@/lib/content";
 import { addDays, dayOfWeek, localDate, mascotLine, weekStart } from "@/lib/rules";
@@ -13,6 +14,14 @@ export default function Home() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(t); }, []);
   useEffect(() => { if (s.hydrated && !s.onboarded) router.replace("/start"); }, [s.hydrated, s.onboarded, router]);
+  const [atGym, setAtGym] = useState(false);
+  useEffect(() => {
+    if (!s.hydrated || !s.profile.gymLat || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const d = Math.hypot((pos.coords.latitude - s.profile.gymLat!) * 111000, (pos.coords.longitude - s.profile.gymLng!) * 111000 * Math.cos((s.profile.gymLat! * Math.PI) / 180));
+      setAtGym(d < 150);
+    }, () => {}, { maximumAge: 300000, timeout: 8000 });
+  }, [s.hydrated, s.profile.gymLat, s.profile.gymLng]);
 
   if (!s.hydrated || !s.onboarded || !now) return <div className="screen" />;
 
@@ -112,6 +121,9 @@ export default function Home() {
           <button onClick={() => { s.startSet("normal"); router.push("/set"); }} className="flex-1 h-[54px] rounded-2xl border-[1.5px] border-ink-4 font-bold text-[14px] text-muted">Do the full Set</button>
         </div>
       )}
+
+      {atGym && !doneToday && <div className="mx-6 mt-3.5 bg-ink-3 rounded-[18px] px-4 py-3.5 flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-lime a-blink" /><div className="flex-1 text-[13px]"><span className="font-bold">You're at {s.profile.gymName}.</span> <span className="text-muted">Start the Set, then grab a proof shot for the Crew.</span></div></div>}
+      {atGym && doneToday && <div className="mx-6 mt-3.5 text-ink"><div className="bg-lime rounded-[18px] px-4 py-3.5"><div className="font-extrabold text-[14px] mb-2">Still at {s.profile.gymName}? Proof shot time.</div><ProofShot /></div></div>}
 
       <section className="mx-6 mt-4"><Mascot line={line} mood={atRisk ? "worried" : "neutral"} /></section>
       {s.adaptiveNote && !doneToday && <div className="mx-6 mt-3 text-[12px] text-muted bg-ink-2 rounded-xl px-3.5 py-2.5 leading-[1.4]">{s.adaptiveNote}</div>}

@@ -57,6 +57,11 @@ export interface Profile {
   accessibility: Flag[];
   whyText?: string;
   whyWho?: string;
+  treatText?: string;
+  treatMilestone?: number;
+  gymLat?: number;
+  gymLng?: number;
+  gymName?: string;
   createdAt: string;
 }
 
@@ -71,6 +76,10 @@ export interface LeagueRow { id: string; displayName: string; goalTier: GoalTier
 export type LeagueTier = "bronze" | "silver" | "gold" | "sapphire" | "diamond";
 export const LEAGUE_TIERS: LeagueTier[] = ["bronze", "silver", "gold", "sapphire", "diamond"];
 
-export interface DuoQuest { partnerId: string; partnerName: string; targetXp: number; yourXp: number; partnerXp: number; weekStart: string; status: "active" | "cleared" | "failed" }
+export interface DuoQuest { partnerId: string; partnerName: string; targetXp: number; yourXp: number; partnerXp: number; weekStart: string; status: "active" | "cleared" | "failed"; wagerYou?: string; wagerPartner?: string }
+
+export interface ProofShot { id: string; date: string; dataUrl: string; setId: string; expiresAt: string }
+export interface PinkyPromise { id: string; date: string; voucherId: string; voucherName: string; status: "pending" | "vouched" | "declined" }
+export interface CrewAward { id: string; name: string; userId: string; userName: string; blurb: string }
 
 export interface DayLog { date: string; kind: "perfect" | "done" | "rest" | "missed" | "frozen" }
