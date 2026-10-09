@@ -275,7 +275,7 @@ create policy "crew members read" on crew_members for select to authenticated us
 create policy "crew members join" on crew_members for insert to authenticated with check (user_id = auth.uid());
 create policy "saves read" on streak_saves for select to authenticated using (saver_id = auth.uid() or saved_id = auth.uid());
 create policy "leagues read" on leagues for select to authenticated using (exists (select 1 from league_members m where m.league_id = id and m.user_id = auth.uid()));
-create policy "league members read" on league_members for select to authenticated using (exists (select 1 from league_members me where me.league_id = league_id and me.user_id = auth.uid()));
+create policy "league members read" on league_members for select to authenticated using (exists (select 1 from league_members me where me.league_id = league_members.league_id and me.user_id = auth.uid()));
 create policy "gems read" on gem_ledger for select to authenticated using (user_id = auth.uid());
 create policy "push own" on push_subscriptions for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
@@ -298,7 +298,7 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
 create or replace function complete_set(p_set_id uuid) returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   s sets%rowtype; p profiles%rowtype; st streaks%rowtype;
-  mv jsonb; completed int := 0; perfect boolean := true; xp int; first_of_day boolean; crown_ups track_t[] := '{}';
+  mv jsonb; completed int := 0; v_perfect boolean := true; v_xp int; first_of_day boolean; crown_ups track_t[] := '{}';
   t track_t; c user_crowns%rowtype; lvl crown_levels%rowtype; reqs jsonb; hit boolean; relevant int; r jsonb; today date;
 begin
   select * into s from sets where id = p_set_id and user_id = auth.uid() for update;
@@ -310,9 +310,9 @@ begin
 
   for mv in select * from jsonb_array_elements(s.moves) loop
     if coalesce((mv->>'achieved')::int, 0) > 0 then completed := completed + 1; end if;
-    if coalesce((mv->>'achieved')::int, 0) < (mv->>'target')::int then perfect := false; end if;
+    if coalesce((mv->>'achieved')::int, 0) < (mv->>'target')::int then v_perfect := false; end if;
   end loop;
-  perfect := perfect and jsonb_array_length(s.moves) > 0;
+  v_perfect := v_perfect and jsonb_array_length(s.moves) > 0;
   first_of_day := not exists (select 1 from sets x where x.user_id = s.user_id and x.date = s.date and x.status = 'done' and x.kind <> 'placement');
 
   -- crowns
@@ -321,9 +321,10 @@ begin
     select * into c from user_crowns where user_id = s.user_id and track = t for update;
     select * into lvl from crown_levels where track = t and level = c.level;
     reqs := case when p.environment = 'gym' then lvl.gym else lvl.requirements end;
-    hit := true; relevant := 0;
+    hit := true; relevant := 0; mv := null;
     for r in select * from jsonb_array_elements(reqs) loop
-      select mv into mv from jsonb_array_elements(s.moves) mv where mv->>'movement' = r->>'movement' limit 1;
+      mv := null;
+      select e into mv from jsonb_array_elements(s.moves) e where e->>'movement' = r->>'movement' limit 1;
       if mv is not null then relevant := relevant + 1; if coalesce((mv->>'achieved')::int,0) < (mv->>'target')::int then hit := false; end if; end if;
     end loop;
     if relevant = 0 then continue; end if;
@@ -335,11 +336,11 @@ begin
     update user_crowns set level = c.level, clears = c.clears, misses = c.misses, last_clear_date = c.last_clear_date where user_id = s.user_id and track = t;
   end loop;
 
-  xp := completed * 10;
-  if first_of_day then xp := xp * 2; end if;
-  if array_length(crown_ups, 1) > 0 then xp := round(xp * 1.5); end if;
-  if perfect then xp := xp + 25; end if;
-  if s.kind = 'rescue' then xp := round(xp * 0.5); end if;
+  v_xp := completed * 10;
+  if first_of_day then v_xp := v_xp * 2; end if;
+  if array_length(crown_ups, 1) > 0 then v_xp := round(v_xp * 1.5); end if;
+  if v_perfect then v_xp := v_xp + 25; end if;
+  if s.kind = 'rescue' then v_xp := round(v_xp * 0.5); end if;
 
   -- streak
   if st.last_counted_date is distinct from s.date then
@@ -348,20 +349,20 @@ begin
     update streaks set current = st.current, longest = st.longest, last_counted_date = st.last_counted_date where user_id = s.user_id;
   end if;
 
-  update sets set status = 'done', xp = xp, perfect = perfect, finished_at = now() where id = s.id;
-  insert into set_results (set_id, movement, target, achieved, xp) select s.id, mv->>'movement', (mv->>'target')::int, coalesce((mv->>'achieved')::int,0), 10 from jsonb_array_elements(s.moves) mv;
-  insert into day_log (user_id, date, kind) values (s.user_id, s.date, case when s.kind in ('rest','rescue') then 'rest' when perfect then 'perfect' else 'done' end)
+  update sets set status = 'done', xp = v_xp, perfect = v_perfect, finished_at = now() where id = s.id;
+  insert into set_results (set_id, movement, target, achieved, xp) select s.id, e->>'movement', (e->>'target')::int, coalesce((e->>'achieved')::int,0), 10 from jsonb_array_elements(s.moves) e;
+  insert into day_log (user_id, date, kind) values (s.user_id, s.date, case when s.kind in ('rest','rescue') then 'rest' when v_perfect then 'perfect' else 'done' end)
     on conflict (user_id, date) do update set kind = excluded.kind where day_log.kind in ('missed','frozen');
-  update profiles set xp_total = xp_total + xp, gems = gems + (case when perfect then 10 else 0 end) + coalesce(array_length(crown_ups,1),0) * 25 where id = s.user_id;
-  if perfect then insert into gem_ledger (user_id, delta, reason) values (s.user_id, 10, 'perfect_set'); end if;
+  update profiles set xp_total = xp_total + v_xp, gems = gems + (case when v_perfect then 10 else 0 end) + coalesce(array_length(crown_ups,1),0) * 25 where id = s.user_id;
+  if v_perfect then insert into gem_ledger (user_id, delta, reason) values (s.user_id, 10, 'perfect_set'); end if;
   if array_length(crown_ups,1) > 0 then insert into gem_ledger (user_id, delta, reason) values (s.user_id, 25 * array_length(crown_ups,1), 'crown_up'); end if;
-  update league_members lm set xp = lm.xp + xp, sets = lm.sets + (case when first_of_day then 1 else 0 end), perfect = lm.perfect + (case when perfect then 1 else 0 end),
-    xp_normalized = round((lm.xp + xp)::numeric / (case p.goal_tier when 'casual' then 5 when 'regular' then 10 else 15 end) * 10)
+  update league_members lm set xp = lm.xp + v_xp, sets = lm.sets + (case when first_of_day then 1 else 0 end), perfect = lm.perfect + (case when v_perfect then 1 else 0 end),
+    xp_normalized = round((lm.xp + v_xp)::numeric / (case p.goal_tier when 'casual' then 5 when 'regular' then 10 else 15 end) * 10)
     from leagues l where lm.league_id = l.id and lm.user_id = s.user_id and l.week_start = (select max(week_start) from leagues);
-  update duo_quests set xp_a = xp_a + xp where user_a = s.user_id and status = 'active';
-  update duo_quests set xp_b = xp_b + xp where user_b = s.user_id and status = 'active';
+  update duo_quests set xp_a = xp_a + v_xp where user_a = s.user_id and status = 'active';
+  update duo_quests set xp_b = xp_b + v_xp where user_b = s.user_id and status = 'active';
   delete from presence where user_id = s.user_id;
-  return jsonb_build_object('xp', xp, 'perfect', perfect, 'crown_ups', to_jsonb(crown_ups), 'streak', st.current);
+  return jsonb_build_object('xp', v_xp, 'perfect', v_perfect, 'crown_ups', to_jsonb(crown_ups), 'streak', st.current);
 end $$;
 revoke all on function complete_set(uuid) from public;
 grant execute on function complete_set(uuid) to authenticated;
