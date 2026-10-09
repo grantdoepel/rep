@@ -45,7 +45,7 @@ function DoneInner() {
       {atRisk && (
         <div className="a-rise d4 mx-6 mt-3.5 bg-ink text-text rounded-[22px] p-4">
           <div className="flex items-center gap-3"><Avatar initials={atRisk.displayName.slice(0, 2).toUpperCase()} color={atRisk.color} size={44} /><div className="flex-1"><div className="font-bold text-[15px]">{atRisk.displayName.split(" ")[0]} hasn't moved today</div><div className="text-[13px] text-muted mt-0.5">A {atRisk.streak}-day streak ends at midnight.</div></div></div>
-          <button onClick={() => s.nudge(atRisk.id)} disabled={nudged} className={`mt-3.5 w-full h-[50px] rounded-[14px] font-extrabold text-[15px] flex items-center justify-center gap-2 ${nudged ? "bg-ink-4 text-muted" : "bg-lime text-ink"}`}><Icon.Send />{nudged ? 'Sent · "Keep your Rep" · +5 XP' : `Nudge ${atRisk.displayName.split(" ")[0]}`}</button>
+          <button onClick={() => s.nudge(atRisk.id)} disabled={nudged} className={`mt-3.5 w-full h-[50px] rounded-[14px] font-extrabold text-[15px] flex items-center justify-center gap-2 ${nudged ? "bg-ink-4 text-muted" : "bg-lime text-ink"}`}><Icon.Send />{nudged ? 'Sent · "Beat yesterday" · +5 XP' : `Nudge ${atRisk.displayName.split(" ")[0]}`}</button>
         </div>
       )}
 

@@ -130,11 +130,11 @@ export function mascotLine(ctx: { hour: number; doneToday: boolean; streak: numb
   if (ctx.dayMilestone === 30 && ctx.whyText) return `A month ago you wrote: "${ctx.whyText}". Thirty days. I'm not going to make this a whole thing.`;
   if (ctx.restDay) return "Rest day. I mean it. Three minutes of stretching and then go sit down. You earned the sitting.";
   if (ctx.doneToday && ctx.atRiskFriend) return `You're done. ${ctx.atRiskFriend} isn't. Their streak ends at midnight. Just saying.`;
-  if (ctx.doneToday) return "Done. Nothing else to do here. Go live your life.";
+  if (ctx.doneToday) return "Done. Today-you beat yesterday-you. Go live your life.";
   if (ctx.hour >= 21) return `${ctx.streak} days. Three minutes. I swapped today's Set for something you can do in socks.`;
   if (ctx.hour >= 19) return "It's getting late. Not late late. Late enough that I'm mentioning it.";
   if (ctx.aheadFriend) return `${ctx.aheadFriend.name} is ${ctx.aheadFriend.by} XP ahead of you and it's ${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()]}. I'm just saying.`;
-  if (ctx.streak === 0) return "Day one is the only day that's ever hard. Five minutes.";
+  if (ctx.streak === 0) return "Day one is the only day that's ever hard. Five minutes. You vs. you.";
   return "Today's Set is already picked. One tap. I'll wait.";
 }
 

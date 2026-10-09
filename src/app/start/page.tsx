@@ -113,7 +113,7 @@ export default function Start() {
 
       {step === 5 && <div className="a-rise flex flex-col flex-1 pt-8">
         <div className="text-[12px] font-bold text-lime tracking-[1.5px] uppercase">Day 1 · +60 XP earned</div>
-        <div className="display text-[36px] mt-2.5 leading-[1.05]">You have a Rep now.<br />Let's keep it.</div>
+        <div className="display text-[36px] mt-2.5 leading-[1.05]">That's day one.<br />Tomorrow, beat it.</div>
         <div className="grid grid-cols-3 gap-2 mt-5">
           {[["Push", pl.pushups >= 8 ? 3 : pl.pushups >= 5 ? 2 : 1], ["Legs", pl.squats >= 15 ? 3 : pl.squats >= 10 ? 2 : 1], ["Core", pl.plank >= 30 ? 3 : pl.plank >= 20 ? 2 : 1]].map(([t, l]) => <div key={t} className="bg-ink-3 rounded-[14px] p-3"><div className="text-[11px] text-muted font-bold">{t}</div><div className="display text-[22px] mt-0.5">Crown {l}</div></div>)}
         </div>
@@ -127,9 +127,9 @@ export default function Start() {
             {!sent ? <div className="flex gap-2"><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="or email" className="flex-1 h-12 rounded-xl bg-ink-3 border-[1.5px] border-ink-4 px-4 text-[14px] outline-none" /><button onClick={async () => { const r = await sync.signInWithEmail(email); if (r.ok) setSent(true); }} className="h-12 px-4 rounded-xl bg-ink-3 font-bold text-[14px]">Send link</button></div> : <div className="text-[13px] text-lime font-semibold">Check your email for the sign-in link.</div>}
           </div>
         ) : (
-          <div className="mt-5 text-[13px] text-muted bg-ink-2 rounded-xl px-3.5 py-3 leading-[1.4]">Accounts arrive with the backend. For now your Rep lives on this device.</div>
+          <div className="mt-5 text-[13px] text-muted bg-ink-2 rounded-xl px-3.5 py-3 leading-[1.4]">Accounts arrive with the backend. For now your progress lives on this device.</div>
         )}
-        <button onClick={() => finish()} className="mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">Start my Rep</button>
+        <button onClick={() => finish()} className="mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">Start · you vs. you</button>
       </div>}
     </div>
   );

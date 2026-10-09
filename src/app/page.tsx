@@ -61,7 +61,7 @@ export default function Home() {
             <div className="display text-[56px]">{s.streak.current}</div>
             {atRisk && <span className="text-coral font-bold text-[14px] self-center">at risk</span>}
           </div>
-          <div className="text-[14px] text-muted mt-1.5 font-medium">day streak · {s.streak.freezes} freeze{s.streak.freezes === 1 ? "" : "s"} left</div>
+          <div className="text-[14px] text-muted mt-1.5 font-medium">day streak · you vs. you · {s.streak.freezes} freeze{s.streak.freezes === 1 ? "" : "s"} left</div>
         </div>
         <Link href="/league" className="text-right">
           <Eyebrow>{tierName} league</Eyebrow>

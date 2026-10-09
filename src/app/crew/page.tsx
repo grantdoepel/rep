@@ -19,7 +19,7 @@ export default function Crew() {
 
   return (
     <div className="screen">
-      <TopBar title="Crew" back="/friends" right={<button aria-label="Invite" onClick={() => navigator.share?.({ title: "Tuesday Crew on Rep", url: location.origin + "/?crew=tuesday" }).catch(() => {})} className="w-10 h-10 rounded-full bg-lime flex items-center justify-center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>} />
+      <TopBar title="Crew" back="/friends" right={<button aria-label="Invite" onClick={() => navigator.share?.({ title: "Tuesday Crew on uvu", url: location.origin + "/?crew=tuesday" }).catch(() => {})} className="w-10 h-10 rounded-full bg-lime flex items-center justify-center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>} />
       <div className="px-6 pt-5"><div className="flex items-center gap-2"><div className="display text-[30px]">Tuesday Crew</div><span className="text-[11px] font-bold bg-ink-3 text-muted rounded-full px-2 py-1">9 of 12</span></div><div className="text-[13px] text-muted mt-1.5 font-medium">One weekly goal. Everyone's Set counts. Nobody gets left behind.</div></div>
 
       <div className="mx-6 mt-4 bg-ink-3 rounded-[22px] p-[18px]">
