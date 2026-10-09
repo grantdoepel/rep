@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #0C0D11;
+  --ink-2: #15171E;
+  --ink-3: #1A1C23;
+  --ink-4: #2A2D38;
+  --text: #F4F5F7;
+  --text-2: #D5D8E0;
+  --muted: #9AA0AE;
+  --muted-2: #6B7180;
+  --lime: #C8FF3D;
+  --lime-dim: #6E8A1F;
+  --coral: #FF6B4A;
+  --blue: #3D4EFF;
+  --sky: #8FB0FF;
+  --amber: #FFB347;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-lime: var(--lime);
+  --color-lime-dim: var(--lime-dim);
+  --color-coral: var(--coral);
+  --color-blue: var(--blue);
+  --color-sky: var(--sky);
+  --color-amber: var(--amber);
+  --font-sans: var(--font-dm), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-dm), sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
   }
+  button, input { font-family: inherit; }
+  a { color: inherit; text-decoration: none; }
+  * { -webkit-tap-highlight-color: transparent; }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+.display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+
+@keyframes pulse-ring { 0%,100%{transform:scale(1);opacity:.55} 50%{transform:scale(1.06);opacity:.2} }
+@keyframes flicker { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-1px) scale(1.05)} }
+@keyframes grow { from{width:0} }
+@keyframes rise { from{transform:translateY(24px);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes pop { from{transform:scale(.8)} to{transform:scale(1)} }
+@keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+@keyframes fall { 0%{transform:translateY(-40px) rotate(0)} 100%{transform:translateY(100vh) rotate(540deg)} }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+@keyframes slidein { from{transform:translateX(-12px);opacity:0} to{transform:translateX(0);opacity:1} }
+@keyframes shine { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+.a-ring { animation: pulse-ring 2.4s ease-in-out infinite; }
+.a-flicker { animation: flicker 1.6s ease-in-out infinite; }
+.a-grow { animation: grow 1.2s cubic-bezier(.2,.8,.2,1) both; }
+.a-rise { animation: rise .6s cubic-bezier(.2,.9,.2,1) both; }
+.a-pop { animation: pop .25s cubic-bezier(.2,1.4,.4,1); }
+.a-bob { animation: bob 1.4s ease-in-out infinite; }
+.a-fall { animation: fall 3s linear infinite; }
+.a-blink { animation: blink 1.4s ease-in-out infinite; }
+.a-slidein { animation: slidein .5s cubic-bezier(.2,.9,.2,1) both; }
+.a-shine { animation: shine 3s linear infinite; background-size: 200% 100%; }
+.d1{animation-delay:.12s}.d2{animation-delay:.24s}.d3{animation-delay:.36s}.d4{animation-delay:.5s}
+
+.safe-top { padding-top: max(20px, env(safe-area-inset-top)); }
+.safe-bottom { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.screen { min-height: 100dvh; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; }
