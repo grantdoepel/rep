@@ -23,12 +23,19 @@ export default function Friends() {
   const missedYesterday = !s.log.some((l) => l.date === yesterday && l.kind !== "missed") && yesterday >= s.profile.createdAt.slice(0, 10) && s.log.length > 0;
   const pendingPinky = s.pinkyPromises.find((p) => p.date === yesterday);
   const shots = s.proofShots;
+  const inviteUrl = s.inviteCode ? `${location.origin}/?invite=${s.inviteCode}` : null;
+  const invite = async () => {
+    if (!inviteUrl) { s.acceptInvite(""); return; }
+    const data = { title: "uvu", text: "You vs. you. Be my Duo on uvu.", url: inviteUrl };
+    if (navigator.share) { try { await navigator.share(data); } catch {} return; }
+    try { await navigator.clipboard.writeText(inviteUrl); } catch {}
+  };
 
   return (
     <div className="screen">
       <div className="safe-top px-6 pt-10 flex items-end justify-between">
         <div><div className="display text-[30px]">Friends</div><div className="text-[13px] text-muted mt-1.5 font-medium">{s.friends.filter((f) => f.doneToday).length} already beat yesterday</div></div>
-        <button aria-label="Add friend" onClick={() => navigator.share?.({ title: "uvu", text: "Be my Duo on uvu.", url: location.origin + "/?ref=" + s.profile.username }).catch(() => {})} className="w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+        <button aria-label="Invite a friend" onClick={invite} className="w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
       </div>
 
       {moving.length > 0 && (
@@ -91,8 +98,20 @@ export default function Friends() {
         </div>
       )}
 
+      {s.online && s.friends.length === 0 && (
+        <div className="mx-6 mt-4 rounded-[22px] p-5 border-[1.5px] border-dashed border-ink-4">
+          <div className="display text-[22px]">Nobody's watching yet.</div>
+          <div className="text-[13px] text-muted mt-2 leading-[1.45]">uvu is better with one person who'll notice when you skip. Send your link; when they sign up you're friends, and either of you can start a Duo.</div>
+          <button onClick={invite} className="mt-4 w-full h-12 rounded-2xl bg-lime text-ink font-extrabold text-[15px]">Share my invite link</button>
+          {inviteUrl && <div className="text-[11px] text-muted mt-2.5 text-center break-all">{inviteUrl}</div>}
+        </div>
+      )}
+      {!s.online && (
+        <div className="mx-6 mt-4 rounded-[18px] px-4 py-3 bg-ink-3 text-[12px] text-muted leading-[1.4]">You're looking at demo friends. Sign in from Settings to see real ones and send invites.</div>
+      )}
+
       <div className="flex flex-col gap-2 px-6 pt-4 pb-5">
-        <div className="text-[11px] font-bold text-muted tracking-[1px] uppercase pb-0.5">This week</div>
+        {s.friends.length > 0 && <div className="text-[11px] font-bold text-muted tracking-[1px] uppercase pb-0.5">This week</div>}
         {s.friends.map((f) => {
           const nudged = s.nudgedToday.includes(f.id);
           const cheered = s.cheered.includes(f.id);
@@ -105,6 +124,8 @@ export default function Friends() {
                 <button onClick={() => s.nudge(f.id)} disabled={nudged} className={`h-[38px] px-3.5 rounded-full font-extrabold text-[13px] ${nudged ? "bg-ink-4 text-muted" : "bg-coral text-ink"}`}>{nudged ? "Sent" : "Nudge"}</button>
               ) : f.doneToday || f.movingNow ? (
                 <button onClick={() => s.cheer(f.id)} aria-label={`Cheer ${f.displayName}`} className={`w-[38px] h-[38px] rounded-full flex items-center justify-center ${cheered ? "bg-lime text-ink" : "bg-ink-4 text-text"}`}><Icon.Thumb /></button>
+              ) : !duo && s.online ? (
+                <button onClick={() => s.setDuo(f.id)} className="h-[38px] px-3.5 rounded-full font-extrabold text-[13px] bg-ink-4">Duo</button>
               ) : (
                 <div className="flex items-center gap-1"><Icon.Flame size={16} /><span className="font-extrabold text-[14px]">{f.streak}</span></div>
               )}

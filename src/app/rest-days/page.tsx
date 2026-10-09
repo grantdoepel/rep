@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Environment, Flag, GoalTier } from "@/lib/types";
 import { Mascot, TopBar } from "@/components/ui";
+import { Reminders } from "@/components/Reminders";
+import { Account } from "@/components/Account";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FLAGS: [Flag, string][] = [["knees", "Knees or hips"], ["shoulders", "Shoulders"], ["wrists", "Wrists"], ["low_back", "Low back"], ["seated", "Seated only"], ["low_impact", "Low impact only"]];
@@ -45,6 +47,9 @@ export default function RestDays() {
       <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase">Gym arrival reminder</div>
         <div className="flex gap-2 mt-2.5"><input value={gymName} onChange={(e) => setGymName(e.target.value)} placeholder="Gym name" className="flex-1 h-11 rounded-xl bg-ink-3 border-[1.5px] border-ink-4 px-3.5 text-[14px] outline-none focus:border-lime" /><button onClick={saveGym} className="h-11 px-4 rounded-xl bg-ink-3 font-bold text-[13px] text-lime">{s.profile.gymLat ? "Re-pin" : "Pin here"}</button></div>
         <div className="text-[12px] text-muted mt-2 leading-[1.4]">{gymStatus ?? (s.profile.gymLat ? `Pinned: ${s.profile.gymName}. Arrive and uvu asks for a proof shot.` : "Stand at the gym door and tap Pin here. Only your device keeps the coordinates.")}</div></div>
+
+      <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase mb-2.5">Account</div><Account /></div>
+      <div className="px-6 pt-4"><div className="text-[12px] font-bold text-muted tracking-[1.5px] uppercase mb-2.5">Reminders</div><Reminders /></div>
 
       <div className="mt-auto px-6 pb-8 safe-bottom pt-5"><button onClick={save} className="h-14 rounded-2xl bg-lime text-ink font-extrabold text-[16px] w-full">Save</button></div>
     </div>

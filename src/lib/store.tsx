@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { CrewAward, Crowns, DailySet, DayLog, DuoQuest, Friend, LeagueRow, LeagueTier, PinkyPromise, Profile, ProofShot, SetMove, Streak, Track } from "./types";
 import { addDays, applyCrownProgress, countDay, generateSet, localDate, scoreSet, tierFromScore, weekStart } from "./rules";
 import { MOVEMENT_BY_ID } from "./content";
@@ -31,6 +31,11 @@ export interface State {
   adaptiveNote?: string;
   seenMonday?: string;
   seenMilestone?: number;
+  online: boolean;              // signed in: friends/league/duo come from the server
+  userId?: string;
+  inviteCode?: string;
+  toast?: string;
+  pendingInvite?: string;
 }
 
 type Actions = {
@@ -51,6 +56,9 @@ type Actions = {
   resolvePinky: (id: string, ok: boolean) => void;
   setTreat: (text: string, milestone: number) => void;
   setGym: (lat: number, lng: number, name: string) => void;
+  refresh: () => Promise<void>;
+  acceptInvite: (code: string) => Promise<void>;
+  dismissToast: () => void;
   reset: () => void;
 };
 
@@ -83,6 +91,7 @@ function initial(): State {
     profile: { id: "local", username: "you", displayName: "You", goalTier: "regular", environment: "home", tier: "standard", timezone: tz, restDays: [0], injuryFlags: [], accessibility: [], createdAt: "" },
     crowns: {}, streak: { current: 0, longest: 0, freezes: 2 }, gems: 0, xpTotal: 0, xpWeek: 0,
     log: [], leagueTier: "bronze", league: seedLeague(0, friends), friends, nudgedToday: [], cheered: [], proofShots: [], pinkyPromises: [], pinkyUsedThisMonth: 0, awards: [],
+    online: false,
   };
 }
 
@@ -90,12 +99,35 @@ const Ctx = createContext<(State & Actions) | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [s, setS] = useState<State>(initial);
+  const sRef = useRef(s); sRef.current = s;
 
   useEffect(() => {
     try { const raw = localStorage.getItem(KEY); if (raw) { const saved = JSON.parse(raw) as State; setS({ ...initial(), ...saved, hydrated: true, profile: { ...saved.profile, createdAt: saved.profile.createdAt || new Date().toISOString() } }); return; } } catch {}
     setS((x) => ({ ...x, hydrated: true, profile: { ...x.profile, createdAt: new Date().toISOString() } }));
   }, []);
   useEffect(() => { if (s.hydrated) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} } }, [s]);
+
+  const pull = useCallback(async () => {
+    const r = await sync.pull().catch(() => null);
+    if (!r) { setS((x) => (x.online ? { ...x, online: false } : x)); return; }
+    setS((x) => ({ ...x, online: true, userId: r.userId, inviteCode: r.inviteCode, friends: r.friends, league: r.league.length ? r.league : x.league.filter((row) => row.isYou), leagueTier: r.leagueTier ?? x.leagueTier, duo: r.duo }));
+  }, []);
+  useEffect(() => {
+    if (!s.hydrated) return;
+    pull();
+    const onFocus = () => { if (document.visibilityState === "visible") pull(); };
+    document.addEventListener("visibilitychange", onFocus); window.addEventListener("focus", onFocus);
+    const t = setInterval(pull, 90_000);
+    return () => { document.removeEventListener("visibilitychange", onFocus); window.removeEventListener("focus", onFocus); clearInterval(t); };
+  }, [s.hydrated, pull]);
+
+  // An invite link opened before sign-in waits until there is a session.
+  useEffect(() => {
+    if (!s.online || !s.pendingInvite) return;
+    const code = s.pendingInvite;
+    setS((x) => ({ ...x, pendingInvite: undefined }));
+    sync.acceptInvite(code).then((r) => { setS((x) => ({ ...x, toast: r.ok ? `You and ${r.name ?? "your friend"} are friends now.` : r.error ?? "That invite didn't work." })); pull(); });
+  }, [s.online, s.pendingInvite, pull]);
 
   // Ensure today's Set exists and roll over day/week bookkeeping.
   useEffect(() => {
@@ -114,7 +146,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
         if (weekStart(today) !== weekStart(x.today?.date ?? today)) { next.xpWeek = 0; next.duo = undefined; }
       }
-      if (!next.duo) next.duo = { partnerId: "f_priya", partnerName: "Priya", targetXp: 2000, yourXp: next.xpWeek, partnerXp: 600, weekStart: weekStart(today), status: "active", wagerPartner: "Loser buys coffee" };
+      if (!next.duo && !x.online) next.duo = { partnerId: "f_priya", partnerName: "Priya", targetXp: 2000, yourXp: next.xpWeek, partnerXp: 600, weekStart: weekStart(today), status: "active", wagerPartner: "Loser buys coffee" };
       next.proofShots = (next.proofShots ?? []).filter((p) => p.expiresAt > new Date().toISOString());
       return next;
     });
@@ -138,11 +170,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const today = localDate(new Date(), x.profile.timezone);
         const base = kind === "rescue" ? generateSet(x.profile, x.crowns, today, [], { rescue: true }) : (x.today && x.today.date === today ? x.today : generateSet(x.profile, x.crowns, today));
         out = { ...base, status: "active", moves: base.moves.map((m) => ({ ...m, achieved: undefined })) };
+        if (x.online) sync.presence(out.id, 0);
         return { ...x, active: out };
       });
       return out;
     },
-    recordMove: (i, achieved) => set((x) => x.active ? { ...x, active: { ...x.active, moves: x.active.moves.map((m, j) => (j === i ? { ...m, achieved } : m)) } } : x),
+    recordMove: (i, achieved) => set((x) => { if (!x.active) return x; if (x.online && achieved > 0) sync.presence(x.active.id, i); return { ...x, active: { ...x.active, moves: x.active.moves.map((m, j) => (j === i ? { ...m, achieved } : m)) } }; }),
     swapEasier: (i) => set((x) => {
       if (!x.active) return x;
       const mv = MOVEMENT_BY_ID[x.active.moves[i].movement];
@@ -167,7 +200,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const friends = x.friends.map((f) => (f.movingNow ? { ...f, movingNow: false, doneToday: true } : f));
         const league = x.league.map((r) => (r.isYou ? { ...r, xp: x.xpWeek + xp, sets: r.sets + (firstOfDay ? 1 : 0) } : r)).sort((a, b) => b.xp - a.xp);
         result = { xp, perfect, crownUps };
-        sync.setResult(x.profile.id, done, crowns, streak);
+        sync.setResult(x.profile.id, done, crowns, streak).then(() => { if (x.online) pull(); });
         return { ...x, active: undefined, today: done, lastDone: done, crowns, streak, xpTotal: x.xpTotal + xp, xpWeek: x.xpWeek + xp, gems, log, adaptiveNote, league, friends, duo: x.duo ? { ...x.duo, yourXp: x.duo.yourXp + xp } : x.duo };
       });
       return result;
@@ -177,12 +210,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       set((x) => { if (x.streak.freezes <= 0) return x; ok = true; const today = localDate(new Date(), x.profile.timezone); return { ...x, streak: { ...countDay(x.streak, today), freezes: x.streak.freezes - 1 }, log: x.log.filter((l) => l.date !== today).concat({ date: today, kind: "frozen" }) }; });
       return ok;
     },
-    nudge: (id) => set((x) => x.nudgedToday.includes(id) ? x : { ...x, nudgedToday: [...x.nudgedToday, id], xpTotal: x.xpTotal + 5, xpWeek: x.xpWeek + 5 }),
+    nudge: (id) => set((x) => { if (x.nudgedToday.includes(id)) return x; if (x.online) sync.nudge(id); return { ...x, nudgedToday: [...x.nudgedToday, id], xpTotal: x.xpTotal + 5, xpWeek: x.xpWeek + 5 }; }),
     cheer: (id) => set((x) => ({ ...x, cheered: x.cheered.includes(id) ? x.cheered.filter((c) => c !== id) : [...x.cheered, id] })),
-    setDuo: (id) => set((x) => { const f = x.friends.find((f) => f.id === id); if (!f) return x; return { ...x, friends: x.friends.map((g) => ({ ...g, isDuo: g.id === id })), duo: { partnerId: id, partnerName: f.displayName.split(" ")[0], targetXp: 2000, yourXp: x.xpWeek, partnerXp: Math.round(f.xpWeek * 0.55), weekStart: weekStart(localDate()), status: "active" } }; }),
+    setDuo: (id) => set((x) => { const f = x.friends.find((f) => f.id === id); if (!f) return x; if (x.online) { sync.setDuo(id).then((r) => { if (!r.ok) setS((y) => ({ ...y, toast: r.error ?? "Couldn't start that Duo." })); pull(); }); } return { ...x, friends: x.friends.map((g) => ({ ...g, isDuo: g.id === id })), duo: { partnerId: id, partnerName: f.displayName.split(" ")[0], targetXp: 2000, yourXp: x.xpWeek, partnerXp: Math.round(f.xpWeek * 0.55), weekStart: weekStart(localDate()), status: "active" } }; }),
     markMondaySeen: () => set((x) => ({ ...x, seenMonday: weekStart(localDate(new Date(), x.profile.timezone)) })),
     addProofShot: (dataUrl) => set((x) => { const today = localDate(new Date(), x.profile.timezone); const exp = new Date(Date.now() + 24 * 3600 * 1000).toISOString(); return { ...x, proofShots: [...x.proofShots.filter((p) => p.date !== today), { id: `ps_${Date.now()}`, date: today, dataUrl, setId: x.lastDone?.id ?? "", expiresAt: exp }] }; }),
-    setWager: (mine) => set((x) => (x.duo ? { ...x, duo: { ...x.duo, wagerYou: mine } } : x)),
+    setWager: (mine) => set((x) => { if (!x.duo) return x; if (x.online) sync.setWager(mine); return { ...x, duo: { ...x.duo, wagerYou: mine } }; }),
     requestPinky: (date) => {
       let out: PinkyPromise | null = null;
       set((x) => { if (x.pinkyUsedThisMonth >= 2 || !x.duo) return x; const partner = x.friends.find((f) => f.id === x.duo!.partnerId); out = { id: `pp_${Date.now()}`, date, voucherId: x.duo.partnerId, voucherName: partner?.displayName.split(" ")[0] ?? x.duo.partnerName, status: "pending" }; return { ...x, pinkyPromises: [...x.pinkyPromises, out], pinkyUsedThisMonth: x.pinkyUsedThisMonth + 1 }; });
@@ -191,8 +224,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     resolvePinky: (id, ok) => set((x) => { const pp = x.pinkyPromises.find((p) => p.id === id); if (!pp) return x; const promises = x.pinkyPromises.map((p) => (p.id === id ? { ...p, status: ok ? "vouched" as const : "declined" as const } : p)); if (!ok) return { ...x, pinkyPromises: promises }; const streak = countDay(x.streak, pp.date); return { ...x, pinkyPromises: promises, streak, log: x.log.filter((l) => l.date !== pp.date).concat({ date: pp.date, kind: "done" }) }; }),
     setTreat: (text, milestone) => set((x) => { const profile = { ...x.profile, treatText: text, treatMilestone: milestone }; sync.profile(profile); return { ...x, profile }; }),
     setGym: (lat, lng, name) => set((x) => { const profile = { ...x.profile, gymLat: lat, gymLng: lng, gymName: name }; sync.profile(profile); return { ...x, profile }; }),
+    refresh: pull,
+    acceptInvite: async (code) => {
+      const c = code.trim().toLowerCase(); if (!c) return;
+      if (!sRef.current.online) { setS((x) => ({ ...x, pendingInvite: c, toast: "Sign in and you'll be friends automatically." })); return; }
+      const r = await sync.acceptInvite(c);
+      setS((x) => ({ ...x, toast: r.ok ? `You and ${r.name ?? "your friend"} are friends now.` : r.error ?? "That invite didn't work." }));
+      pull();
+    },
+    dismissToast: () => set((x) => ({ ...x, toast: undefined })),
     reset: () => { try { localStorage.removeItem(KEY); } catch {} setS({ ...initial(), hydrated: true }); },
-  }), [set]);
+  }), [set, pull]);
 
   const value = useMemo(() => ({ ...s, ...actions }), [s, actions]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -3,6 +3,7 @@ import { Outfit, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { Toast } from "@/components/Toast";
 
 const outfit = Outfit({ subsets: ["latin"], weight: ["500", "700", "800"], variable: "--font-outfit" });
 const dm = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-dm" });
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${outfit.variable} ${dm.variable}`}>
       <body>
-        <StoreProvider>{children}</StoreProvider>
+        <StoreProvider>{children}<Toast /></StoreProvider>
         <ServiceWorker />
       </body>
     </html>

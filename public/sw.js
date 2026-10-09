@@ -1,4 +1,4 @@
-const CACHE = "rep-v1";
+const CACHE = "uvu-v2";
 const SHELL = ["/", "/manifest.json", "/icon.svg"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k))))); self.clients.claim(); });
@@ -12,7 +12,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then((r) => r || caches.match("/"))));
 });
 self.addEventListener("push", (e) => {
-  const d = e.data ? e.data.json() : { title: "Rep", body: "Keep your Rep." };
+  const d = e.data ? e.data.json() : { title: "uvu", body: "You vs. you." };
   e.waitUntil(self.registration.showNotification(d.title, { body: d.body, icon: "/icon-192.png", badge: "/icon-192.png", data: d.url || "/" }));
 });
 self.addEventListener("notificationclick", (e) => { e.notification.close(); e.waitUntil(clients.openWindow(e.notification.data || "/")); });

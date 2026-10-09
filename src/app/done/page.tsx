@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { TRACKS } from "@/lib/content";
 import { Avatar, Confetti, Icon } from "@/components/ui";
 import { ProofShot } from "@/components/ProofShot";
+import { Reminders } from "@/components/Reminders";
 
 function DoneInner() {
   const s = useStore();
@@ -41,6 +42,7 @@ function DoneInner() {
       )}
 
       <div className="a-rise d3 mx-6 mt-3.5"><ProofShot /></div>
+      <div className="a-rise d3 mx-6 mt-3.5"><Reminders compact onDark={false} /></div>
 
       {atRisk && (
         <div className="a-rise d4 mx-6 mt-3.5 bg-ink text-text rounded-[22px] p-4">
