@@ -29,7 +29,7 @@ export default function SetPage() {
   const speak = (text: string) => { if (!audio || !synth.current) return; synth.current.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1; synth.current.speak(u); };
   useEffect(() => { if (mv && move) speak(`${mv.name}. Target ${move.target} ${mv.unit}. ${mv.cue}`); /* eslint-disable-next-line */ }, [i, audio]);
   if (!set || !move || !mv) return <div className="screen" />;
-  const achieved = move.achieved ?? (mv.unit === "seconds" ? hold.t : 0);
+  const achieved = mv.unit === "seconds" ? (hold.running || move.achieved === undefined ? hold.t : move.achieved) : (move.achieved ?? 0);
   const hit = achieved >= move.target;
   const isLast = i === set.moves.length - 1;
   const trackName = TRACKS.find((t) => t.id === mv.track)?.name;
@@ -38,7 +38,7 @@ export default function SetPage() {
 
   const setReps = (n: number) => s.recordMove(i, Math.max(0, Math.min(n, 99)));
   const next = () => {
-    if (mv.unit === "seconds" && move.achieved === undefined) s.recordMove(i, hold.t);
+    if (mv.unit === "seconds" && (hold.running || move.achieved === undefined)) s.recordMove(i, hold.t);
     if (isLast) { finishing.current = true; const r = s.finishSet(); router.push(`/done?xp=${r.xp}&perfect=${r.perfect ? 1 : 0}&crowns=${r.crownUps.join(",")}`); return; }
     setI(i + 1); setHold({ running: false, t: 0 });
   };
@@ -76,7 +76,7 @@ export default function SetPage() {
           {mv.unit === "seconds" ? (
             <>
               <div><div className={`display text-[64px] a-pop ${hit ? "text-lime" : ""}`}>{achieved}<span className="text-[20px] text-muted">s</span></div><div className={`text-[12px] font-bold mt-1 ${hit ? "text-lime" : "text-muted"}`}>{hit ? "Target hit" : `${move.target - achieved}s to go`}</div></div>
-              <button onClick={() => { if (hold.running) { s.recordMove(i, hold.t); setHold({ ...hold, running: false }); } else { s.recordMove(i, 0); setHold({ running: true, t: 0 }); } }} className={`w-[76px] h-[76px] rounded-full font-extrabold text-[14px] ${hold.running ? "bg-coral text-ink" : "bg-lime text-ink"}`}>{hold.running ? "Stop" : move.achieved ? "Redo" : "Start"}</button>
+              <button onClick={() => { if (hold.running) { s.recordMove(i, hold.t); setHold({ ...hold, running: false }); } else { setHold({ running: true, t: 0 }); } }} className={`w-[76px] h-[76px] rounded-full font-extrabold text-[14px] ${hold.running ? "bg-coral text-ink" : "bg-lime text-ink"}`}>{hold.running ? "Stop" : move.achieved ? "Redo" : "Start"}</button>
             </>
           ) : (
             <>

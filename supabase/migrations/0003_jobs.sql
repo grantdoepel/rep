@@ -74,3 +74,9 @@ end $$;
 
 select cron.schedule('rep_close_day', '5 * * * *', $$select close_day()$$);
 select cron.schedule('rep_close_week', '0 0 * * 1', $$select close_week()$$);
+
+-- RLS policies call these SECURITY DEFINER helpers; the calling role must be able to execute them
+-- (the lockdown revoke-from-public above would otherwise 403 every profile/set write).
+grant execute on function public.are_friends(uuid, uuid) to authenticated;
+grant execute on function public.same_league(uuid, uuid) to authenticated;
+grant execute on function public.same_crew(uuid, uuid) to authenticated;
