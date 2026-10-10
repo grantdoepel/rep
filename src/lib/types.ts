@@ -85,7 +85,7 @@ export interface Profile {
 }
 
 // PRD 3 · a crew: up to six people, one shared weekly target
-export interface Crew { id: string; name: string; code: string; weekStart: string; xp: number; targetXp: number; kept: boolean; members: { id: string; displayName: string; doneToday: boolean; doneAt?: string; streak: number; color: string; isYou?: boolean }[] }
+export interface Crew { id: string; name: string; code: string; weekStart: string; xp: number; targetXp: number; kept: boolean; createdAt?: string; members: { id: string; displayName: string; doneToday: boolean; doneAt?: string; streak: number; color: string; isYou?: boolean; isCaptain?: boolean }[] }
 // PRD 8 · a prescribed plan
 export interface Plan { id: string; clinic: string; moves: { id: string; name: string; target: number; unit: "reps" | "seconds"; cue?: string }[]; weeks: number; daysPerWeek: number; startedAt: string }
 // one ledger row (move_daily)

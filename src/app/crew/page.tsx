@@ -1,46 +1,161 @@
 "use client";
-import { useRouter } from "next/navigation";
+// PRD 3 · Crews. One crew, up to six people, one shared weekly target. This is the whole surface.
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { dayOfWeek, localDate } from "@/lib/rules";
-import { Avatar, TopBar, useMounted } from "@/components/ui";
+import { track } from "@/lib/analytics";
+import { createCrew, crewDaysLeft, crewInviteUrl, crewWeekNumber, formatDoneAt, joinCrew, leaveCrew } from "@/lib/crews";
+import { Account } from "@/components/Account";
+import { Avatar, Button, Icon, TopBar, useMounted } from "@/components/ui";
 
-export default function Crew() {
+export default function CrewPage() {
   const s = useStore();
   const mounted = useMounted();
-  const router = useRouter();
-  const [rallied, setRallied] = useState<string[]>([]);
   if (!mounted) return <div className="screen" />;
-  const today = localDate(new Date(), s.profile.timezone);
-  const daysLeft = 7 - ((dayOfWeek(today) + 6) % 7);
-  const members = [{ id: "you", name: "You", sets: Math.min(6, s.log.filter((l) => l.kind !== "missed").slice(-7).length), color: "#0C0D11", fg: "#C8FF3D", sub: `${s.streak.current} streak` }, ...s.friends.map((f) => ({ id: f.id, name: f.displayName.split(" ")[0], sets: f.atRisk ? 2 : 4 + (f.streak % 3), color: f.color, fg: "#F4F5F7", sub: f.movingNow ? "Moving now" : f.id === "f_priya" ? `Captain · ${f.streak} streak` : `${f.streak} streak`, atRisk: f.atRisk && !f.doneToday }))];
-  const total = members.reduce((a, m) => a + m.sets, 0) + 22; const goal = 54;
-  const moving = s.friends.filter((f) => f.movingNow);
-
   return (
     <div className="screen">
-      <TopBar title="Crew" back="/friends" right={<button aria-label="Invite" onClick={() => navigator.share?.({ title: "Tuesday Crew on uvu", url: location.origin + "/?crew=tuesday" }).catch(() => {})} className="w-10 h-10 rounded-full bg-lime flex items-center justify-center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>} />
-      <div className="px-6 pt-5"><div className="flex items-center gap-2"><div className="display text-[30px]">Tuesday Crew</div><span className="text-[11px] font-bold bg-ink-3 text-muted rounded-full px-2 py-1">9 of 12</span></div><div className="text-[13px] text-muted mt-1.5 font-medium">One weekly goal. Everyone's Set counts. Nobody gets left behind.</div></div>
-
-      <div className="mx-6 mt-4 bg-ink-3 rounded-[22px] p-[18px]">
-        <div className="flex items-end justify-between"><div><div className="text-[11px] font-bold text-lime tracking-[1.5px] uppercase">Crew goal · this week</div><div className="display text-[34px] mt-1.5">{total} <span className="text-[16px] text-muted font-sans font-semibold">/ {goal} Sets</span></div></div><div className="text-right"><div className="text-[12px] text-muted font-semibold">{daysLeft} days left</div><div className="text-[13px] text-lime font-bold">{total / goal >= (8 - daysLeft) / 7 ? "Ahead of pace" : "Behind pace"}</div></div></div>
-        <div className="mt-3.5 h-2.5 rounded-full bg-ink-4 overflow-hidden"><div className="a-grow h-2.5 rounded-full bg-lime" style={{ width: `${Math.min(100, (total / goal) * 100)}%` }} /></div>
-        <div className="text-[12px] text-muted mt-2 leading-[1.4]">Goal = 6 Sets per person. Hit it and everyone gets a crew badge and 150 gems. Miss it and nobody does.</div>
-      </div>
-
-      {moving.length > 0 && <div className="mx-6 mt-3.5 bg-lime/6 border-[1.5px] border-lime/25 rounded-2xl px-3.5 py-3 flex items-center gap-2.5"><div className="w-2 h-2 rounded-full bg-lime a-blink" /><div className="flex-1 text-[13px]"><span className="font-bold">{moving.map((f) => f.displayName.split(" ")[0]).join(" and ")}</span> <span className="text-muted">mid-Set right now</span></div><button onClick={() => { s.startSet("normal"); router.push("/set"); }} className="text-[12px] font-bold text-lime">Join →</button></div>}
-
-      <div className="flex flex-col gap-1.5 px-6 pt-4 pb-5">
-        <div className="text-[11px] font-bold text-muted tracking-[1px] uppercase pb-1">This week</div>
-        {members.map((m) => (
-          <div key={m.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-[14px] bg-ink-3 ${"atRisk" in m && m.atRisk ? "border-[1.5px] border-coral" : ""}`}>
-            <Avatar initials={m.name.slice(0, 2).toUpperCase()} color={m.color} fg={m.fg} />
-            <div className="flex-1"><div className="font-bold text-[14px]">{m.name}</div><div className={`text-[11px] font-semibold ${"atRisk" in m && m.atRisk ? "text-coral" : m.sub === "Moving now" ? "text-lime" : "text-muted"}`}>{"atRisk" in m && m.atRisk ? `${m.sets} Sets · needs ${6 - m.sets} in ${daysLeft} days` : m.sub}</div></div>
-            {"atRisk" in m && m.atRisk ? <button onClick={() => setRallied([...rallied, m.id])} disabled={rallied.includes(m.id)} className={`h-[34px] px-3 rounded-full font-extrabold text-[12px] ${rallied.includes(m.id) ? "bg-ink-4 text-muted" : "bg-coral text-ink"}`}>{rallied.includes(m.id) ? "Rallied" : "Rally"}</button> : <div className="flex gap-[3px]">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="w-2.5 h-[18px] rounded-[3px]" style={{ background: i < m.sets ? "#C8FF3D" : "#2A2D38" }} />)}</div>}
-          </div>
-        ))}
-      </div>
-      <div className="mt-auto px-6 pb-8 safe-bottom"><div className="text-[12px] text-muted-2 text-center leading-[1.4]">Crew chat and streak saves arrive with accounts.</div></div>
+      <TopBar title="Crew" back="/" />
+      {!s.online ? <NeedsAccount /> : s.crew ? <HasCrew /> : <NoCrew />}
     </div>
+  );
+}
+
+function NeedsAccount() {
+  return (
+    <div className="px-6 pt-6 flex flex-col gap-4">
+      <div className="display t-h1">Crews need an account</div>
+      <div className="t-body text-text-2">A crew is three to six people and one weekly target. The target lives on the server, so sign in first.</div>
+      <Account />
+    </div>
+  );
+}
+
+function NoCrew() {
+  const s = useStore();
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState<"create" | "join" | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const create = async () => {
+    const n = name.trim(); if (!n || busy) return;
+    setBusy("create"); setErr(null);
+    const r = await createCrew(n);
+    if (r.ok) { await s.refresh(); s.patch(() => ({ toast: `${n} is live. Send the link.` })); } else setErr(r.error);
+    setBusy(null);
+  };
+  const join = async () => {
+    const c = code.trim(); if (!c || busy) return;
+    setBusy("join"); setErr(null);
+    const r = await joinCrew(c, "code");
+    if (r.ok) { await s.refresh(); s.patch(() => ({ toast: `You're in ${r.value}.` })); } else setErr(r.error);
+    setBusy(null);
+  };
+
+  return (
+    <div className="px-6 pt-6 flex flex-col gap-6">
+      <div>
+        <div className="display t-h1">Start a crew</div>
+        <div className="t-body text-text-2 mt-2">Three to six people. One target a week: 300 XP each, pooled. Everyone keeps it or nobody does.</div>
+      </div>
+      <div className="flex flex-col gap-2.5">
+        <label className="t-micro text-muted" htmlFor="crew-name">Name it</label>
+        <input id="crew-name" value={name} onChange={(e) => setName(e.target.value.slice(0, 24))} maxLength={24} placeholder="Tuesday people" enterKeyHint="done" onKeyDown={(e) => e.key === "Enter" && create()} className="h-12 rounded-xl bg-ink-3 border-[1.5px] border-ink-4 px-3.5 text-[15px] outline-none focus:border-lime" />
+        <div className="flex items-center justify-between"><span className="t-small text-muted-2">{name.trim().length}/24</span></div>
+        <Button onClick={create} disabled={!name.trim() || busy !== null}>{busy === "create" ? "Starting…" : "Create"}</Button>
+      </div>
+      <div className="hairline pt-5 flex flex-col gap-2.5">
+        <label className="t-micro text-muted" htmlFor="crew-code">Have a code?</label>
+        <div className="flex gap-2">
+          <input id="crew-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="8 characters" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" onKeyDown={(e) => e.key === "Enter" && join()} className="flex-1 h-12 rounded-xl bg-ink-3 border-[1.5px] border-ink-4 px-3.5 text-[15px] outline-none focus:border-lime font-mono tracking-wide" />
+          <button onClick={join} disabled={!code.trim() || busy !== null} className="press h-12 px-5 rounded-xl border-[1.5px] border-ink-4 font-bold text-[15px] disabled:opacity-40">{busy === "join" ? "…" : "Join"}</button>
+        </div>
+      </div>
+      {err && <div role="alert" className="t-small text-coral">{err}</div>}
+    </div>
+  );
+}
+
+function HasCrew() {
+  const s = useStore();
+  const crew = s.crew!;
+  const [leaving, setLeaving] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const today = localDate(new Date(), s.profile.timezone);
+  const daysLeft = crewDaysLeft(dayOfWeek(today));
+  const week = crewWeekNumber(crew, today);
+  const pct = crew.targetXp > 0 ? Math.min(100, (crew.xp / crew.targetXp) * 100) : 0;
+  const members = [...crew.members].sort((a, b) => Number(b.doneToday) - Number(a.doneToday) || Number(b.isYou ?? false) - Number(a.isYou ?? false));
+  const doneCount = crew.members.filter((m) => m.doneToday).length;
+
+  const invite = async () => {
+    const url = crewInviteUrl(crew.code);
+    track("invite_sent", { kind: "crew" });
+    const data = { title: "uvu", text: `Join ${crew.name} on uvu. Three minutes a day, one target a week.`, url };
+    if (navigator.share) { try { await navigator.share(data); } catch {} return; }
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  };
+  const leave = async () => {
+    if (busy) return; setBusy(true);
+    const r = await leaveCrew();
+    if (r.ok) { s.patch(() => ({ crew: undefined, toast: `You left ${crew.name}.` })); await s.refresh(); } else s.patch(() => ({ toast: r.error }));
+    setBusy(false); setLeaving(false);
+  };
+
+  return (
+    <>
+      <div className="px-6 pt-5">
+        <div className="flex items-end justify-between gap-3">
+          <div className="display t-h1 break-words min-w-0">{crew.name}</div>
+          <div className="t-small text-muted-2 font-semibold whitespace-nowrap pb-1">Week {week}</div>
+        </div>
+        <div className="mt-4 flex items-baseline justify-between">
+          <div className="t-num text-[28px]">{crew.xp.toLocaleString()} <span className="t-small text-muted font-semibold">of {crew.targetXp.toLocaleString()}</span></div>
+          {crew.kept ? <span className="t-small font-bold text-lime">kept</span> : <span className="t-small text-muted-2 font-semibold">{daysLeft} day{daysLeft === 1 ? "" : "s"} left</span>}
+        </div>
+        <div className="mt-2 h-2 rounded-full bg-ink-4 overflow-hidden"><div className="a-grow h-2 rounded-full bg-lime" style={{ width: `${pct}%` }} /></div>
+        <div className="mt-1.5 t-small text-muted">{crew.members.length} of 6 · 300 XP each · {doneCount} done today</div>
+      </div>
+
+      <div className="hairline mx-6 mt-5 pt-4 flex flex-col">
+        <div className="t-micro text-muted mb-1">Today</div>
+        {members.map((m) => {
+          const first = m.displayName.split(" ")[0];
+          const nudged = s.nudgedToday.includes(m.id);
+          return (
+            <div key={m.id} className="flex items-center gap-3 py-2.5">
+              <div className={`rounded-full ${m.doneToday ? "ring-2 ring-lime ring-offset-2 ring-offset-ink" : ""}`}>
+                <Avatar initials={m.displayName.split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase()} color={m.color} fg={m.isYou ? "#0C0D11" : "#F4F5F7"} size={40} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-[15px] truncate">{m.isYou ? "You" : first}{m.isCaptain && <span className="ml-1.5 t-micro text-muted-2 normal-case tracking-normal font-semibold">captain</span>}</div>
+                <div className={`t-small ${m.doneToday ? "text-lime font-semibold" : "text-muted"}`}>{m.doneToday ? formatDoneAt(m.doneAt, s.profile.timezone) : "not yet"}</div>
+              </div>
+              <div className="flex items-center gap-1 w-12 justify-end"><Icon.Flame size={14} /><span className="t-num text-[14px]">{m.streak}</span></div>
+              {!m.doneToday && !m.isYou && (
+                <button onClick={() => s.nudge(m.id)} disabled={nudged} aria-label={`Nudge ${first}`} className={`press h-9 px-3.5 rounded-full border-[1.5px] text-[13px] font-bold ${nudged ? "border-transparent bg-ink-3 text-muted-2" : "border-ink-4 text-text"}`}>{nudged ? "Sent" : "Nudge"}</button>
+              )}
+            </div>
+          );
+        })}
+        {crew.members.length < 6 && <div className="t-small text-muted-2 py-2">{6 - crew.members.length} more {6 - crew.members.length === 1 ? "seat" : "seats"}. Each one raises the target by 300.</div>}
+      </div>
+
+      <div className="mt-auto px-6 pt-6 pb-8 safe-bottom flex flex-col items-center gap-3">
+        <Button onClick={invite}>{copied ? "Link copied" : "Invite"}</Button>
+        {!leaving ? (
+          <button onClick={() => setLeaving(true)} className="press h-11 px-4 t-small font-semibold text-muted">Leave {crew.name}</button>
+        ) : (
+          <div className="w-full flex items-center justify-between gap-3 bg-ink-3 rounded-2xl px-4 py-2.5">
+            <span className="t-small text-text-2">Leave the crew? Your XP this week stays with them.</span>
+            <div className="flex gap-1.5 shrink-0">
+              <button onClick={leave} disabled={busy} className="press h-9 px-3 rounded-full bg-text text-ink text-[13px] font-bold disabled:opacity-40">{busy ? "…" : "Leave"}</button>
+              <button onClick={() => setLeaving(false)} className="press h-9 px-3 rounded-full text-[13px] font-bold text-muted">Stay</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

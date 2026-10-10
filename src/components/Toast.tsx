@@ -1,8 +1,10 @@
 "use client";
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
+import { useCrewLinkIntake, useCrewPendingJoin } from "@/lib/crews";
 
 // Global toast + invite-link intake. Lives in the layout so it works on any route.
+// ?invite=<code> accepts a friend (store); ?crew=<code> joins a crew (crews.ts, same waiting-for-sign-in shape).
 export function Toast() {
   const s = useStore();
   useEffect(() => {
@@ -12,6 +14,8 @@ export function Toast() {
     if (code) { u.searchParams.delete("invite"); window.history.replaceState({}, "", u.pathname + (u.search || "")); s.acceptInvite(code); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.hydrated]);
+  useCrewLinkIntake();
+  useCrewPendingJoin();
   useEffect(() => { if (!s.toast) return; const t = setTimeout(s.dismissToast, 4500); return () => clearTimeout(t); }, [s.toast, s.dismissToast]);
   if (!s.toast) return null;
   return (

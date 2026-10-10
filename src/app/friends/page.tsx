@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { addDays, dayOfWeek, localDate } from "@/lib/rules";
-import { Avatar, Icon, TabBar, useMounted } from "@/components/ui";
+import { Avatar, Icon, Section, TabBar, useMounted } from "@/components/ui";
 
 export default function Friends() {
   const s = useStore();
@@ -35,8 +35,32 @@ export default function Friends() {
     <div className="screen">
       <div className="safe-top px-6 pt-8 flex items-end justify-between">
         <div><div className="t-micro text-muted">{s.friends.length ? `${s.friends.filter((f) => f.doneToday).length} of ${s.friends.length} moved today` : "You vs. you, together"}</div><div className="display t-h1 mt-1.5">Friends</div></div>
-        <button aria-label="Invite a friend" onClick={invite} className="press w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+        <div className="flex items-center gap-2">
+          <Link href="/crew" className="press h-11 px-4 rounded-full border-[1.5px] border-ink-4 flex items-center text-[14px] font-bold">Crew</Link>
+          <button aria-label="Invite a friend" onClick={invite} className="press w-11 h-11 rounded-full bg-lime flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0C0D11" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+        </div>
       </div>
+
+      {/* PRD 3 · your crew, at the top; the whole block is one tap into /crew */}
+      {s.crew ? (
+        <Section title="Your crew" right={s.crew.kept ? <span className="t-small font-bold text-lime">kept</span> : <span className="t-small text-muted-2 font-semibold">{daysLeft}d left</span>} className="mt-1">
+          <Link href="/crew" className="block press">
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-bold text-[15px] truncate">{s.crew.name}</div>
+              <div className="flex items-center">{[...s.crew.members].sort((a, b) => Number(b.isYou ?? false) - Number(a.isYou ?? false)).map((m, i) => <div key={m.id} className={`rounded-full border-2 border-ink box-border ${m.doneToday ? "ring-2 ring-lime" : ""}`} style={{ marginLeft: i ? -8 : 0 }}><Avatar initials={m.displayName.split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase()} color={m.color} fg={m.isYou ? "#0C0D11" : "#F4F5F7"} size={28} /></div>)}</div>
+            </div>
+            <div className="mt-2.5 h-2 rounded-full bg-ink-4 overflow-hidden"><div className="a-grow h-2 rounded-full bg-lime" style={{ width: `${s.crew.targetXp > 0 ? Math.min(100, (s.crew.xp / s.crew.targetXp) * 100) : 0}%` }} /></div>
+            <div className="mt-1.5 t-small text-muted">{s.crew.xp.toLocaleString()} of {s.crew.targetXp.toLocaleString()} {s.crew.kept ? "· kept" : "together"} · {s.crew.members.filter((m) => m.doneToday).length} of {s.crew.members.length} done today</div>
+          </Link>
+        </Section>
+      ) : s.online ? (
+        <Section title="Your crew" className="mt-1">
+          <Link href="/crew" className="flex items-center justify-between press py-1">
+            <span className="t-small text-muted">Three to six people, one target. Start one.</span>
+            <span className="t-small font-bold text-lime pl-3 whitespace-nowrap">Start a crew</span>
+          </Link>
+        </Section>
+      ) : null}
 
       {moving.length > 0 && (
         <Link href="/live" className="mx-6 mt-4 bg-lime/6 border-[1.5px] border-lime/25 rounded-2xl px-3.5 py-3 flex items-center gap-2.5">
@@ -134,11 +158,6 @@ export default function Friends() {
         })}
       </div>
 
-      <Link href="/crew" className="mx-6 mb-5 rounded-[18px] border-[1.5px] border-dashed border-ink-4 px-4 py-3.5 flex items-center gap-3">
-        <div className="flex">{[0, 1, 2].map((i) => <div key={i} className="w-7 h-7 rounded-full bg-ink-4 border-2 border-ink box-border" style={{ marginLeft: i ? -8 : 0 }} />)}</div>
-        <div className="flex-1"><div className="font-bold text-[14px]">Tuesday Crew</div><div className="text-[12px] text-muted font-semibold">Up to 12 people, one weekly goal</div></div>
-        <span className="text-[11px] font-bold text-muted bg-ink-3 px-2 py-1 rounded-full">9 of 12</span>
-      </Link>
       <TabBar />
     </div>
   );
