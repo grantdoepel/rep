@@ -8,6 +8,9 @@ import { Avatar, Confetti, CountUp, Icon } from "@/components/ui";
 import { Vee } from "@/components/Vee";
 import { ProofShot } from "@/components/ProofShot";
 import { Reminders } from "@/components/Reminders";
+import { NoteOffer } from "@/components/bets/NoteOffer";
+import { TestResult } from "@/components/bets/TestResult";
+import { CrewDoneLine } from "@/components/bets/CrewDoneLine";
 
 function DoneInner() {
   const s = useStore();
@@ -45,6 +48,7 @@ function DoneInner() {
         <div className={`t-body opacity-75 mt-2 transition-opacity duration-500 ${stage >= 2 ? "opacity-75" : "opacity-0"}`}>{sub}</div>
       </div>
 
+      <TestResult />
       {/* the ledger, today's column */}
       <div className={`mx-6 mt-6 transition-opacity duration-500 ${stage >= 2 ? "opacity-100" : "opacity-0"}`}>
         {rows.map((r, idx) => (
@@ -62,6 +66,8 @@ function DoneInner() {
       </div>
 
       <div className={`mx-6 mt-4 flex flex-col gap-2.5 transition-opacity duration-500 ${stage >= 2 ? "opacity-100" : "opacity-0"}`}>
+        <CrewDoneLine />
+        <NoteOffer perfect={perfect} />
         <ProofShot />
         <Reminders compact onDark={false} />
         {atRisk && (

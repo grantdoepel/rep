@@ -7,6 +7,10 @@ import { useStore } from "@/lib/store";
 import { MOVEMENT_BY_ID, TRACKS } from "@/lib/content";
 import { addDays, dayOfWeek, localDate, mascotLine, weekStart } from "@/lib/rules";
 import { Avatar, Icon, Mascot, Pulse, Section, TabBar, Wordmark } from "@/components/ui";
+import { CrewCard } from "@/components/bets/CrewCard";
+import { TestSetCard } from "@/components/bets/TestSetCard";
+import { MovedNote } from "@/components/bets/MovedNote";
+import { PlanBadge } from "@/components/bets/PlanBadge";
 
 export default function Home() {
   const s = useStore();
@@ -77,6 +81,11 @@ export default function Home() {
         <div className="mt-2"><Pulse days={week} width={340} height={56} /></div>
       </section>
 
+      {/* the eight bets: slots filled by their features (render null until then) */}
+      <MovedNote today={today} />
+      <TestSetCard today={today} />
+      <PlanBadge />
+
       {/* today's set: the one surface on the screen */}
       {set && !doneToday && (
         <section className={`mx-6 mt-4 rounded-[26px] p-5 text-ink ${atRisk ? "bg-coral" : "bg-lime"}`}>
@@ -132,7 +141,9 @@ export default function Home() {
         </Link>
       </Section>
 
-      {s.duo && (
+      <CrewCard daysLeft={daysLeft} />
+
+      {s.duo && !s.crew && (
         <Section title={`Duo with ${s.duo.partnerName}`} right={<span className="t-small text-muted-2 font-semibold">{daysLeft}d left</span>}>
           <Link href="/friends" className="block press">
             <div className="flex justify-between t-small font-semibold"><span>You {s.duo.yourXp.toLocaleString()}</span><span className="text-sky">{s.duo.partnerName} {s.duo.partnerXp.toLocaleString()}</span></div>

@@ -1,6 +1,8 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { CrewAward, Crowns, DailySet, DayLog, DuoQuest, Friend, LeagueRow, LeagueTier, PinkyPromise, Profile, ProofShot, SetMove, Streak, Track } from "./types";
+import type { Crew, CrewAward, Crowns, DailySet, DayLog, DuoQuest, Friend, LeagueRow, LeagueTier, LedgerRow, PinkyPromise, Plan, Profile, ProofShot, SetMove, Streak, Track } from "./types";
+import { track } from "./analytics";
+import { planSet } from "./plans";
 import { addDays, applyCrownProgress, countDay, generateSet, localDate, scoreSet, tierFromScore, weekStart } from "./rules";
 import { MOVEMENT_BY_ID } from "./content";
 import { sync } from "./supabase";
@@ -38,12 +40,19 @@ export interface State {
   inviteCode?: string;
   toast?: string;
   pendingInvite?: string;
+  // ---- the eight bets: slots owned by their feature modules (see src/lib/<feature>.ts) ----
+  crew?: Crew;                  // PRD 3
+  plan?: Plan;                  // PRD 8
+  ledger: LedgerRow[];          // move_daily, pulled when online (PRD 7 series, Monday diffs)
+  notePlayedOn?: string;        // PRD 5: date the note was last played (one play per evening)
+  testSkippedOn?: string;       // PRD 7: date the Test Set was last skipped
+  lastHealthCheck?: string;     // PRD 4: ISO time of the last Health query
 }
 
 type Actions = {
   completeOnboarding: (p: Partial<Profile>, placement: { pushups: number; squats: number; plank: number }) => void;
   updateProfile: (p: Partial<Profile>) => void;
-  startSet: (kind?: "normal" | "rescue") => DailySet;
+  startSet: (kind?: "normal" | "rescue", via?: DailySet["via"]) => DailySet;
   recordMove: (i: number, achieved: number) => void;
   swapEasier: (i: number) => void;
   finishSet: (final?: { index: number; achieved: number }) => { xp: number; perfect: boolean; crownUps: Track[]; beats: number; moves: number };
@@ -62,6 +71,10 @@ type Actions = {
   acceptInvite: (code: string) => Promise<void>;
   dismissToast: () => void;
   reset: () => void;
+  // generic state patch for feature modules; prefer a named action when the change is reused
+  patch: (fn: (x: State) => Partial<State>) => void;
+  // merge profile fields and sync the extras (promise, rescue_at, anchor, note, birth year, health)
+  patchProfile: (p: Partial<Profile>) => void;
 };
 
 const KEY = "rep.v1";
@@ -93,7 +106,7 @@ function initial(): State {
     profile: { id: "local", username: "you", displayName: "You", goalTier: "regular", environment: "home", tier: "standard", timezone: tz, restDays: [0], injuryFlags: [], accessibility: [], createdAt: "" },
     crowns: {}, streak: { current: 0, longest: 0, freezes: 2 }, gems: 0, xpTotal: 0, xpWeek: 0,
     log: [], leagueTier: "bronze", league: seedLeague(0, friends), friends, nudgedToday: [], cheered: [], proofShots: [], pinkyPromises: [], pinkyUsedThisMonth: 0, awards: [],
-    recent: {}, online: false,
+    recent: {}, online: false, ledger: [],
   };
 }
 
@@ -104,7 +117,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const sRef = useRef(s); sRef.current = s;
 
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) { const saved = JSON.parse(raw) as State; setS({ ...initial(), ...saved, recent: saved.recent ?? {}, hydrated: true, profile: { ...saved.profile, createdAt: saved.profile.createdAt || new Date().toISOString() } }); return; } } catch {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const saved = JSON.parse(raw) as State; setS({ ...initial(), ...saved, recent: saved.recent ?? {}, ledger: saved.ledger ?? [], hydrated: true, profile: { ...saved.profile, createdAt: saved.profile.createdAt || new Date().toISOString() } }); return; } } catch {}
     setS((x) => ({ ...x, hydrated: true, profile: { ...x.profile, createdAt: new Date().toISOString() } }));
   }, []);
   useEffect(() => { if (s.hydrated) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} } }, [s]);
@@ -112,7 +125,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const pull = useCallback(async () => {
     const r = await sync.pull().catch(() => null);
     if (!r) { setS((x) => (x.online ? { ...x, online: false } : x)); return; }
-    setS((x) => ({ ...x, online: true, userId: r.userId, inviteCode: r.inviteCode, friends: r.friends, league: r.league.length ? r.league : x.league.filter((row) => row.isYou), leagueTier: r.leagueTier ?? x.leagueTier, duo: r.duo }));
+    setS((x) => ({ ...x, online: true, userId: r.userId, inviteCode: r.inviteCode, friends: r.friends, league: r.league.length ? r.league : x.league.filter((row) => row.isYou), leagueTier: r.leagueTier ?? x.leagueTier, duo: r.duo,
+      profile: r.extras ? { ...x.profile, ...r.extras } : x.profile, ledger: r.ledger ?? x.ledger, crew: r.crew ?? x.crew, plan: r.plan ?? x.plan }));
   }, []);
   useEffect(() => {
     if (!s.hydrated) return;
@@ -166,13 +180,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return { ...x, onboarded: true, profile, crowns, streak, xpTotal: 60, xpWeek: 60, gems: 10, log: [{ date: today, kind: "done" }], today: { ...generateSet(profile, crowns, today), status: "planned" } };
     }),
     updateProfile: (p) => set((x) => { const profile = { ...x.profile, ...p }; sync.profile(profile); const today = localDate(new Date(), profile.timezone); const todaySet = x.today?.status === "done" ? x.today : generateSet(profile, x.crowns, today); return { ...x, profile, today: todaySet }; }),
-    startSet: (kind = "normal") => {
+    startSet: (kind = "normal", via?: DailySet["via"]) => {
       let out!: DailySet;
       set((x) => {
         const today = localDate(new Date(), x.profile.timezone);
-        const base = kind === "rescue" ? generateSet(x.profile, x.crowns, today, [], { rescue: true }) : (x.today && x.today.date === today ? x.today : generateSet(x.profile, x.crowns, today));
-        out = { ...base, status: "active", moves: base.moves.map((m) => ({ ...m, achieved: undefined })) };
+        const prescribed = kind === "normal" && x.plan ? planSet(x.plan, x.recent, today) : null;   // PRD 8: the plan is today's Set
+        const base = prescribed ?? (kind === "rescue" ? generateSet(x.profile, x.crowns, today, [], { rescue: true }) : (x.today && x.today.date === today ? x.today : generateSet(x.profile, x.crowns, today)));
+        out = { ...base, status: "active", via, moves: base.moves.map((m) => ({ ...m, achieved: undefined })) };
         if (x.online) sync.presence(out.id, 0);
+        track("set_started", { kind, via: via ?? "home", test: !!out.test, plan: !!out.planId });
         return { ...x, active: out };
       });
       return out;
@@ -210,6 +226,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const friends = x.friends.map((f) => (f.movingNow ? { ...f, movingNow: false, doneToday: true } : f));
       const league = x.league.map((r) => (r.isYou ? { ...r, xp: x.xpWeek + xp, sets: r.sets + (firstOfDay && effort > 0 ? 1 : 0) } : r)).sort((a, b) => b.xp - a.xp);
       if (effort > 0) sync.setResult(x.profile.id, done, crowns, streak).then(() => { if (x.online) pull(); });
+      track("set_done", { kind: active.kind, xp, perfect, beats, moves: effort, test: !!active.test, plan: !!active.planId });
       const next: State = { ...x, recent, active: undefined, today: effort > 0 ? done : x.today, lastDone: done, crowns, streak, xpTotal: x.xpTotal + xp, xpWeek: x.xpWeek + xp, gems, log, adaptiveNote, league, friends, duo: x.duo ? { ...x.duo, yourXp: x.duo.yourXp + xp } : x.duo };
       setS(next); sRef.current = next;
       return { xp, perfect, crownUps, beats, moves: effort };
@@ -242,6 +259,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       pull();
     },
     dismissToast: () => set((x) => ({ ...x, toast: undefined })),
+    patch: (fn) => set((x) => ({ ...x, ...fn(x) })),
+    patchProfile: (p) => set((x) => { const profile = { ...x.profile, ...p }; sync.profileExtras(p); return { ...x, profile }; }),
     reset: () => { try { localStorage.removeItem(KEY); } catch {} setS({ ...initial(), hydrated: true }); },
   }), [set, pull]);
 

@@ -6,6 +6,10 @@ import type { Environment, Flag, GoalTier } from "@/lib/types";
 import { Mascot, TopBar } from "@/components/ui";
 import { Reminders } from "@/components/Reminders";
 import { Account } from "@/components/Account";
+import { AnchorSettings } from "@/components/bets/AnchorSettings";
+import { HealthSettings } from "@/components/bets/HealthSettings";
+import { NoteSettings } from "@/components/bets/NoteSettings";
+import { TestSettings } from "@/components/bets/TestSettings";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FLAGS: [Flag, string][] = [["knees", "Knees or hips"], ["shoulders", "Shoulders"], ["wrists", "Wrists"], ["low_back", "Low back"], ["seated", "Seated only"], ["low_impact", "Low impact only"]];
@@ -48,6 +52,10 @@ export default function RestDays() {
         <div className="flex gap-2 mt-2.5"><input value={gymName} onChange={(e) => setGymName(e.target.value)} placeholder="Gym name" className="flex-1 h-11 rounded-xl bg-ink-3 border-[1.5px] border-ink-4 px-3.5 text-[14px] outline-none focus:border-lime" /><button onClick={saveGym} className="h-11 px-4 rounded-xl bg-ink-3 font-bold text-[13px] text-lime">{s.profile.gymLat ? "Re-pin" : "Pin here"}</button></div>
         <div className="text-[12px] text-muted mt-2 leading-[1.4]">{gymStatus ?? (s.profile.gymLat ? `Pinned: ${s.profile.gymName}. Arrive and uvu asks for a proof shot.` : "Stand at the gym door and tap Pin here. Only your device keeps the coordinates.")}</div></div>
 
+      <AnchorSettings />
+      <HealthSettings />
+      <NoteSettings />
+      <TestSettings />
       <div className="px-6 pt-4"><div className="t-micro text-muted mb-2.5">Account</div><Account /></div>
       <div className="px-6 pt-4"><div className="t-micro text-muted mb-2.5">Reminders</div><Reminders /></div>
 

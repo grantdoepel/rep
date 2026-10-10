@@ -1,12 +1,24 @@
 "use client";
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Crowns, DailySet, DuoQuest, Friend, LeagueRow, LeagueTier, Profile, Streak } from "./types";
+import type { Crew, Crowns, DailySet, DuoQuest, Friend, LeagueRow, LeagueTier, LedgerRow, Plan, Profile, Streak } from "./types";
+import { pullCrew } from "./crews";
+import { pullPlan } from "./plans";
 
 const COLORS = ["#3D4EFF", "#FF6B4A", "#8FB0FF", "#FFB347", "#B48CFF", "#2A2D38"];
 const colorFor = (id: string) => COLORS[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 
-export interface Pulled { userId: string; inviteCode: string; friends: Friend[]; league: LeagueRow[]; leagueTier?: LeagueTier; duo?: DuoQuest }
+export interface Pulled { userId: string; inviteCode: string; friends: Friend[]; league: LeagueRow[]; leagueTier?: LeagueTier; duo?: DuoQuest; extras?: Partial<Profile>; ledger?: LedgerRow[]; crew?: Crew; plan?: Plan }
+
+// profile extras (the eight bets) <-> patch_profile / my_profile_extras
+const EXTRA_KEYS: [keyof Profile, string][] = [["promiseDays", "promise_days"], ["promiseWeeksKept", "promise_weeks_kept"], ["promiseWeekStart", "promise_week_start"], ["rescueAt", "rescue_at"], ["anchor", "anchor"], ["homeLat", "home_lat"], ["homeLng", "home_lng"], ["noteRecordedAt", "note_recorded_at"], ["noteText", "note_text"], ["birthYear", "birth_year"], ["sex", "sex"], ["healthConnected", "health_connected"]];
+function extrasFromRow(row: Record<string, unknown> | null): Partial<Profile> | undefined {
+  if (!row) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [k, col] of EXTRA_KEYS) if (row[col] !== null && row[col] !== undefined) out[k] = col === "rescue_at" ? String(row[col]).slice(0, 5) : row[col];
+  if (row.tag_code) out.tagCode = row.tag_code;
+  return out as Partial<Profile>;
+}
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -39,6 +51,17 @@ export const sync = {
     const sb = supabase(); const uid = await userId(); if (!sb || !uid) return;
     await sb.from("profiles").upsert({ id: uid, username: p.username, display_name: p.displayName, goal_tier: p.goalTier, environment: p.environment, difficulty_tier: p.tier, timezone: p.timezone, rest_days: p.restDays, injury_flags: p.injuryFlags, accessibility_flags: p.accessibility, why_text: p.whyText ?? null, why_who: p.whyWho ?? null });
   },
+  async profileExtras(p: Partial<Profile>) {
+    const sb = supabase(); const uid = await userId(); if (!sb || !uid) return;
+    const row: Record<string, unknown> = {};
+    for (const [k, col] of EXTRA_KEYS) if (p[k] !== undefined) row[col] = p[k];
+    if (Object.keys(row).length) await sb.rpc("patch_profile", { p: row });
+  },
+  async track(name: string, props: Record<string, unknown>) {
+    const sb = supabase(); const uid = await userId(); if (!sb || !uid) return;
+    await sb.rpc("track_event", { p_name: name, p_props: props }).then(() => {}, () => {});
+  },
+  async creditMoved(date: string, source: string) { const sb = supabase(); if (!sb) return false; const { data } = await sb.rpc("credit_moved", { p_date: date, p_source: source }); return data === true; },
   async setResult(_localId: string, set: DailySet, crowns: Crowns, streak: Streak) {
     const sb = supabase(); const uid = await userId(); if (!sb || !uid) return;
     // Server-side scoring: the edge function recomputes XP from set_results so the client can't spoof it.
@@ -47,7 +70,7 @@ export const sync = {
   // Everything social comes from the server once signed in. Local-first still holds: the store keeps its own copy.
   async pull(): Promise<Pulled | null> {
     const sb = supabase(); const uid = await userId(); if (!sb || !uid) return null;
-    const [code, fr, lg, duo] = await Promise.all([sb.rpc("my_invite_code"), sb.rpc("get_friends"), sb.rpc("get_league"), sb.rpc("get_duo")]);
+    const [code, fr, lg, duo, ex, led, crew, plan] = await Promise.all([sb.rpc("my_invite_code"), sb.rpc("get_friends"), sb.rpc("get_league"), sb.rpc("get_duo"), sb.rpc("my_profile_extras"), sb.rpc("my_ledger"), pullCrew(sb).catch(() => undefined), pullPlan(sb).catch(() => undefined)]);
     type FR = { id: string; username: string; display_name: string; streak: number; xp_week: number; done_today: boolean; at_risk: boolean; moving_now: boolean; is_duo: boolean; is_crew: boolean };
     type LR = { user_id: string; display_name: string; goal_tier: "casual" | "regular" | "serious"; sets: number; xp: number; perfect: number; is_you: boolean; is_friend: boolean; tier: LeagueTier };
     const friends: Friend[] = ((fr.data ?? []) as FR[]).map((f) => ({ id: f.id, username: f.username, displayName: f.display_name, streak: f.streak, xpWeek: f.xp_week, doneToday: f.done_today, atRisk: f.at_risk, movingNow: f.moving_now, isDuo: f.is_duo, isCrew: f.is_crew, color: colorFor(f.id) }));
@@ -55,7 +78,9 @@ export const sync = {
     const league: LeagueRow[] = rows.map((r) => ({ id: r.user_id, displayName: r.is_you ? "You" : r.display_name, goalTier: r.goal_tier, sets: r.sets, xp: r.xp, perfect: r.perfect, isYou: r.is_you, isFriend: r.is_friend, isDuo: friends.some((f) => f.id === r.user_id && f.isDuo) }));
     const d = duo.data as (Record<string, unknown> | null);
     const duoQ: DuoQuest | undefined = d ? { partnerId: String(d.partnerId), partnerName: String(d.partnerName).split(" ")[0], targetXp: Number(d.targetXp), yourXp: Number(d.yourXp), partnerXp: Number(d.partnerXp), weekStart: String(d.weekStart), status: d.status as DuoQuest["status"], wagerYou: (d.wagerYou as string) ?? undefined, wagerPartner: (d.wagerPartner as string) ?? undefined } : undefined;
-    return { userId: uid, inviteCode: String(code.data ?? ""), friends, league, leagueTier: rows[0]?.tier, duo: duoQ };
+    type LD = { movement: string; date: string; achieved: number; target: number; test: boolean };
+    const ledger: LedgerRow[] = ((led.data ?? []) as LD[]).map((r) => ({ movement: r.movement, date: r.date, achieved: r.achieved, target: r.target, test: r.test }));
+    return { userId: uid, inviteCode: String(code.data ?? ""), friends, league, leagueTier: rows[0]?.tier, duo: duoQ, extras: extrasFromRow(ex.data as Record<string, unknown> | null), ledger, crew: crew ?? undefined, plan: plan ?? undefined };
   },
   async acceptInvite(code: string): Promise<{ ok: boolean; name?: string; error?: string }> {
     const sb = supabase(); if (!sb) return { ok: false, error: "offline" };
