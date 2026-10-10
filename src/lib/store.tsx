@@ -156,7 +156,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         next.today = generateSet(x.profile, x.crowns, today, yTracks);
         next.active = undefined;
         // mark missed days in log
-        if (x.today && x.today.status !== "done" && x.today.date < today) next.log = [...x.log, { date: x.today.date, kind: x.streak.freezes > 0 ? "frozen" : "missed" }];
+        // a day already credited (moved, frozen, vouched) keeps its row
+        if (x.today && x.today.status !== "done" && x.today.date < today && !x.log.some((l) => l.date === x.today!.date)) next.log = [...x.log, { date: x.today.date, kind: x.streak.freezes > 0 ? "frozen" : "missed" }];
+        next.nudgedToday = [];
         if (x.streak.lastCountedDate && x.streak.lastCountedDate < addDays(today, -1)) {
           next.streak = x.streak.freezes > 0 ? { ...x.streak, freezes: x.streak.freezes - 1, lastCountedDate: addDays(today, -1) } : { ...x.streak, current: 0 };
         }

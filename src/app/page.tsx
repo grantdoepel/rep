@@ -15,9 +15,13 @@ import { TestSetCard } from "@/components/bets/TestSetCard";
 import { MovedNote } from "@/components/bets/MovedNote";
 import { PlanBadge } from "@/components/bets/PlanBadge";
 import { NotePlayback } from "@/components/bets/NotePlayback";
+import { useHealthCredit } from "@/lib/health";
+import { testDue, useLocalTests } from "@/lib/tests";
 
 export default function Home() {
   const s = useStore();
+  useHealthCredit(s);
+  const localTests = useLocalTests();
   const router = useRouter();
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(t); }, []);
@@ -45,7 +49,8 @@ export default function Home() {
 
   const todayStr = now ? localDate(now, s.profile.timezone) : "";
   const doneTodayFlag = !!now && s.today?.status === "done" && s.today.date === todayStr;
-  const evening = !!now && !doneTodayFlag && isEvening(now, s.profile.rescueAt ?? RESCUE_DEFAULT);
+  const movedToday = !!todayStr && s.log.find((l) => l.date === todayStr)?.kind === "moved";   // credited from Health: streak safe, no evening nag
+  const evening = !!now && !doneTodayFlag && !movedToday && isEvening(now, s.profile.rescueAt ?? RESCUE_DEFAULT);
   useEffect(() => { if (evening && todayStr && markRescueShown(todayStr)) track("rescue_shown", { rescueAt: s.profile.rescueAt ?? RESCUE_DEFAULT }); }, [evening, todayStr, s.profile.rescueAt]);
 
   if (!s.hydrated || !s.onboarded || !now) return <div className="screen" />;
@@ -53,7 +58,7 @@ export default function Home() {
   const today = todayStr;
   const doneToday = doneTodayFlag;
   const hour = now.getHours();
-  const atRisk = !doneToday && hour >= 21;
+  const atRisk = !doneToday && !movedToday && hour >= 21;
   const monday = dayOfWeek(today) === 1 && s.seenMonday !== weekStart(today) && s.xpTotal > 60;
   if (monday) { router.replace("/monday"); return <div className="screen" />; }
 
@@ -64,7 +69,7 @@ export default function Home() {
   const atRiskFriend = s.friends.find((f) => f.atRisk && !f.doneToday)?.displayName.split(" ")[0];
   const isRest = s.profile.restDays.includes(dayOfWeek(today));
   const line = mascotLine({ hour, doneToday, streak: s.streak.current, atRiskFriend, aheadFriend: ahead, restDay: isRest && !doneToday, whyText: s.profile.whyText });
-  const week = Array.from({ length: 7 }, (_, i) => { const d = addDays(weekStart(today), i); const l = s.log.find((x) => x.date === d); return { label: "MTWTFSS"[i], kind: d === today ? (doneToday ? l?.kind ?? "done" : "today") : d > today ? "future" : l?.kind ?? (d >= s.profile.createdAt.slice(0, 10) ? "missed" : "future") }; });
+  const week = Array.from({ length: 7 }, (_, i) => { const d = addDays(weekStart(today), i); const l = s.log.find((x) => x.date === d); return { label: "MTWTFSS"[i], kind: d === today ? (doneToday ? l?.kind ?? "done" : movedToday ? "moved" : "today") : d > today ? "future" : l?.kind ?? (d >= s.profile.createdAt.slice(0, 10) ? "missed" : "future") }; });
   const daysLeft = 7 - ((dayOfWeek(today) + 6) % 7);
   const tierName = s.leagueTier[0].toUpperCase() + s.leagueTier.slice(1);
   const placement = s.xpTotal < 400 && s.log.length < 7;   // first week: you're being placed, not ranked
@@ -166,7 +171,7 @@ export default function Home() {
       {slipped && <div className="mx-6 mt-4 display t-h2 text-text-2 a-rise">Yesterday slipped. Today counts.</div>}
 
       {/* today's set: the one surface on the screen */}
-      {set && !doneToday && (
+      {set && !doneToday && !(!s.plan && localTests !== null && testDue(s.log, s.ledger, today, s.testSkippedOn, localTests)) && (
         <section className={`mx-6 mt-4 rounded-[26px] p-5 text-ink ${atRisk ? "bg-coral" : "bg-lime"}`}>
           <div className="flex items-center justify-between">
             <span className="t-micro opacity-70">{atRisk ? "Rescue Set · 3 min" : isRest ? "Rest day · 3 min" : `Today's Set · ${set.plannedMinutes} min`}</span>

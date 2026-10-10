@@ -46,8 +46,14 @@ revoke all on function my_prescriber_id() from anon;
 create policy "prescriber read own" on prescriber for select to authenticated using (user_id = auth.uid());
 create policy "plan read own or member" on plan for select to authenticated
   using (prescriber_id = my_prescriber_id() or exists (select 1 from plan_member m where m.plan_id = id and m.user_id = auth.uid()));
+-- a helper, not a subquery on plan: plan's policy reads plan_member, so a plain subquery here would recurse
+create or replace function i_prescribe(p_plan uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from plan p where p.id = p_plan and p.prescriber_id = my_prescriber_id())
+$$;
+grant execute on function i_prescribe(uuid) to authenticated;
+revoke all on function i_prescribe(uuid) from anon;
 create policy "plan member read own or prescriber" on plan_member for select to authenticated
-  using (user_id = auth.uid() or exists (select 1 from plan p where p.id = plan_id and p.prescriber_id = my_prescriber_id()));
+  using (user_id = auth.uid() or i_prescribe(plan_id));
 -- no insert/update/delete policies: writes go through the RPCs
 
 -- ---------- RPCs ----------

@@ -42,3 +42,4 @@ next-env.d.ts
 e2e.tmp.mjs
 dbg.tmp.mjs
 .env*.local
+.claude/worktrees/

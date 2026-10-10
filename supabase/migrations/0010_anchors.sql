@@ -12,7 +12,7 @@ begin
   if code is null then
     -- 5 random bytes = 10 hex chars; loop on the (astronomically unlikely) unique collision
     loop
-      code := encode(gen_random_bytes(5), 'hex');
+      code := encode(extensions.gen_random_bytes(5), 'hex');
       begin
         update profiles set tag_code = code where id = auth.uid() and tag_code is null;
         exit;

@@ -14,7 +14,7 @@ export function TestSetCard({ today }: { today?: string }) {
 
   if (!today || local === null) return null;
   const doneToday = s.today?.status === "done" && s.today.date === today;
-  if (doneToday || !testDue(s.log, s.ledger, today, s.testSkippedOn, local)) return null;
+  if (doneToday || s.plan || !testDue(s.log, s.ledger, today, s.testSkippedOn, local)) return null;
 
   const series = testSeries(s.ledger, local);
   const lastValue = s.recent[CHAIR_STAND.id]?.achieved ?? series[series.length - 1]?.achieved;

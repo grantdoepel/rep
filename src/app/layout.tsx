@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Outfit, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { Toast } from "@/components/Toast";
+import { AnchorWatcher } from "@/components/bets/AnchorWatcher";
 
 const outfit = Outfit({ subsets: ["latin"], weight: ["500", "700", "800"], variable: "--font-outfit" });
 const dm = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-dm" });
@@ -28,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${outfit.variable} ${dm.variable}`}>
       <body>
-        <StoreProvider>{children}<Toast /></StoreProvider>
+        <StoreProvider>{children}<Toast /><Suspense fallback={null}><AnchorWatcher /></Suspense></StoreProvider>
         <ServiceWorker />
       </body>
     </html>
