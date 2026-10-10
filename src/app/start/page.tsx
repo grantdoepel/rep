@@ -6,6 +6,10 @@ import type { Environment, GoalTier } from "@/lib/types";
 import { Icon, Mascot } from "@/components/ui";
 import { Vee } from "@/components/Vee";
 import { supabaseEnabled, sync } from "@/lib/supabase";
+import { PROMISE_DEFAULT, PROMISE_MAX, PROMISE_MIN } from "@/lib/promise";
+import { localDate, weekStart } from "@/lib/rules";
+import { track } from "@/lib/analytics";
+import { haptic } from "@/components/ui";
 
 const OPT = (on: boolean) => `text-left rounded-[18px] border-[1.5px] px-[18px] flex items-center justify-between w-full ${on ? "border-lime bg-lime/8" : "border-ink-4 bg-ink-3"}`;
 
@@ -17,6 +21,7 @@ export default function Start() {
   const [hard, setHard] = useState<string[]>(["time", "consistent"]);
   const [goal, setGoal] = useState<GoalTier>("regular");
   const [env, setEnv] = useState<Environment>("home");
+  const [promise, setPromise] = useState<number>(PROMISE_DEFAULT);   // PRD 1
   const [pl, setPl] = useState({ pushups: 6, squats: 12, plank: 20 });
   const [plI, setPlI] = useState(0);
   const [why, setWhy] = useState("");
@@ -30,14 +35,17 @@ export default function Start() {
   // Onboarding answers survive the OAuth / magic-link round trip (the page fully reloads on return).
   const DRAFT = "rep.onboarding";
   useEffect(() => {
-    try { const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null"); if (d) { setStep(d.step ?? 0); setFreq(d.freq ?? "some"); setHard(d.hard ?? ["time", "consistent"]); setGoal(d.goal ?? "regular"); setEnv(d.env ?? "home"); setPl(d.pl ?? { pushups: 6, squats: 12, plank: 20 }); setPlI(d.plI ?? 0); setWhy(d.why ?? ""); setWho(d.who ?? "Future me"); } } catch {}
+    try { const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null"); if (d) { setStep(d.step ?? 0); setFreq(d.freq ?? "some"); setHard(d.hard ?? ["time", "consistent"]); setGoal(d.goal ?? "regular"); setEnv(d.env ?? "home"); setPromise(d.promise ?? PROMISE_DEFAULT); setPl(d.pl ?? { pushups: 6, squats: 12, plank: 20 }); setPlI(d.plI ?? 0); setWhy(d.why ?? ""); setWho(d.who ?? "Future me"); } } catch {}
     setReady(true);
   }, []);
-  useEffect(() => { if (!ready) return; try { localStorage.setItem(DRAFT, JSON.stringify({ step, freq, hard, goal, env, pl, plI, why, who })); } catch {} }, [ready, step, freq, hard, goal, env, pl, plI, why, who]);
+  useEffect(() => { if (!ready) return; try { localStorage.setItem(DRAFT, JSON.stringify({ step, freq, hard, goal, env, promise, pl, plI, why, who })); } catch {} }, [ready, step, freq, hard, goal, env, promise, pl, plI, why, who]);
 
   const finish = (u = user) => {
     const name = u?.name?.trim() || u?.email?.split("@")[0] || "You";
     s.completeOnboarding({ goalTier: goal, environment: env, whyText: why || undefined, whyWho: who, displayName: name, username: (u?.email?.split("@")[0] ?? "you").toLowerCase().replace(/[^a-z0-9_]/g, "") || "you" }, pl);
+    // PRD 1 · the promise: how many days a week, and the week it starts
+    s.patchProfile({ promiseDays: promise, promiseWeeksKept: 0, promiseWeekStart: weekStart(localDate(new Date(), s.profile.timezone)) });
+    track("promise_set", { days: promise, via: "onboarding" });
     try { localStorage.removeItem(DRAFT); } catch {}
     router.replace("/");
   };
@@ -46,11 +54,11 @@ export default function Start() {
   useEffect(() => {
     if (!ready || !supabaseEnabled) return;
     let alive = true;
-    sync.currentUser().then((u) => { if (!alive || !u) return; setUser(u); if (step === 5 && s.hydrated && !s.onboarded) finish(u); });
+    sync.currentUser().then((u) => { if (!alive || !u) return; setUser(u); if (step === 6 && s.hydrated && !s.onboarded) finish(u); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, step, s.hydrated]);
-  const Progress = () => <div className="flex gap-1.5">{[0, 1, 2, 3, 4, 5].map((k) => <div key={k} className="w-6 h-1 rounded-full" style={{ background: k <= step ? "#C8FF3D" : "#2A2D38" }} />)}</div>;
+  const Progress = () => <div className="flex gap-1.5">{[0, 1, 2, 3, 4, 5, 6].map((k) => <div key={k} className="w-6 h-1 rounded-full" style={{ background: k <= step ? "#C8FF3D" : "#2A2D38" }} />)}</div>;
   const H = ({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) => <><div className="t-micro text-muted">{eyebrow}</div><div className="display t-h1 mt-2.5">{title}</div>{sub && <div className="t-body text-muted mt-2.5">{sub}</div>}</>;
   const Next = ({ label = "Continue", onClick }: { label?: string; onClick?: () => void }) => <button onClick={onClick ?? (() => setStep(step + 1))} className="press mt-auto mb-8 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full">{label}</button>;
   const plMoves = [{ k: "pushups", name: "Push-ups, any kind", unit: "reps", hint: "Wall, knee, or full. Whatever you've got." }, { k: "squats", name: "Squats", unit: "reps", hint: "To a chair if you like." }, { k: "plank", name: "Plank hold", unit: "seconds", hint: "Forearms down. Stop when it stops being a plank." }] as const;
@@ -63,8 +71,8 @@ export default function Start() {
       {step === 0 && <div className="a-rise flex flex-col flex-1 pt-10">
         <div className="flex items-end justify-between"><div className="t-micro text-lime">You vs. you</div><Vee size={64} mood="happy" bob /></div>
         <div className="display t-h1 mt-2.5">Five minutes a day. Beat the person you were yesterday.</div>
-        <div className="t-body text-muted mt-2.5">No account yet. Three questions, one tiny test, and you have a number to beat tomorrow.</div>
-        <div className="t-micro text-muted mt-8">1 of 3 · How often do you move right now?</div>
+        <div className="t-body text-muted mt-2.5">No account yet. Four questions, one tiny test, and you have a number to beat tomorrow.</div>
+        <div className="t-micro text-muted mt-8">1 of 4 · How often do you move right now?</div>
         <div className="flex flex-col gap-2.5 mt-7">
           {[["never", "Basically never", "And I've quit apps before"], ["some", "Sometimes", "A good week has two or three"], ["most", "Most days", "I just want it to stick"]].map(([k, a, b]) => (
             <button key={k} onClick={() => setFreq(k)} className={`${OPT(freq === k)} h-16`}><span><span className="font-bold text-[16px] block">{a}</span><span className="text-[12px] text-muted">{b}</span></span><span className={`w-6 h-6 rounded-full flex items-center justify-center ${freq === k ? "bg-lime" : "border-2 border-ink-4"}`}>{freq === k && <Icon.Check size={14} />}</span></button>
@@ -73,7 +81,7 @@ export default function Start() {
       </div>}
 
       {step === 1 && <div className="a-rise flex flex-col flex-1 pt-10">
-        <H eyebrow="2 of 3" title="What usually gets in the way?" sub="Pick as many as apply. This sets how the mascot talks to you." />
+        <H eyebrow="2 of 4" title="What usually gets in the way?" sub="Pick as many as apply. This sets how the mascot talks to you." />
         <div className="grid grid-cols-2 gap-2.5 mt-7">
           {[["time", "Finding time"], ["consistent", "Staying consistent"], ["know", "Knowing what to do"], ["gym", "Gyms intimidate me"]].map(([k, a]) => (
             <button key={k} onClick={() => setHard(hard.includes(k) ? hard.filter((x) => x !== k) : [...hard, k])} className={`${OPT(hard.includes(k))} h-[92px] p-3.5 flex-col items-start justify-between`}><span className={`w-5 h-5 rounded-full ${hard.includes(k) ? "bg-lime" : "border-2 border-ink-4"}`} /><span className="font-bold text-[14px]">{a}</span></button>
@@ -82,7 +90,7 @@ export default function Start() {
       </div>}
 
       {step === 2 && <div className="a-rise flex flex-col flex-1 pt-10">
-        <H eyebrow="3 of 3" title="How much per day?" sub="Smaller is better. You can raise it any time." />
+        <H eyebrow="3 of 4" title="How much per day?" sub="Smaller is better. You can raise it any time." />
         <div className="flex flex-col gap-2.5 mt-6">
           {([["casual", "Casual", "5 min"], ["regular", "Regular", "10 min · most popular"], ["serious", "Serious", "15 min"]] as const).map(([k, a, b]) => (
             <button key={k} onClick={() => setGoal(k)} className={`${OPT(goal === k)} h-[60px]`}><span className="font-bold text-[16px]">{a}</span><span className={`text-[13px] font-semibold ${goal === k ? "text-lime" : "text-muted"}`}>{b}</span></button>
@@ -94,6 +102,17 @@ export default function Start() {
       </div>}
 
       {step === 3 && <div className="a-rise flex flex-col flex-1 pt-10">
+        <H eyebrow="4 of 4 · The promise" title="How many days a week, honestly?" sub="Not a goal. A promise, to you. Rest days count when you take them on purpose." />
+        <div className="flex gap-2 mt-7" role="radiogroup" aria-label="Days a week">
+          {Array.from({ length: PROMISE_MAX - PROMISE_MIN + 1 }, (_, i) => PROMISE_MIN + i).map((n) => (
+            <button key={n} role="radio" aria-checked={promise === n} onClick={() => { haptic(); setPromise(n); }} className={`press flex-1 h-14 rounded-full border-[1.5px] display text-[22px] ${promise === n ? "border-lime bg-lime/8 text-lime" : "border-ink-4 bg-ink-3 text-text-2"}`}>{n}</button>
+          ))}
+        </div>
+        <div className="t-small text-muted mt-4">Most people keep 4. You can change it any Monday.</div>
+        <Next />
+      </div>}
+
+      {step === 4 && <div className="a-rise flex flex-col flex-1 pt-10">
         <H eyebrow={`Placement · move ${plI + 1} of 3`} title={plMoves[plI].name} sub={plMoves[plI].hint} />
         <div className="mx-auto mt-8 relative w-[200px] h-[200px] flex items-center justify-center">
           <div className="absolute inset-0 rounded-full border-2 border-lime a-ring" /><div className="absolute inset-5 rounded-full bg-ink-3" />
@@ -104,10 +123,10 @@ export default function Start() {
           <button onClick={() => setPl({ ...pl, [plMoves[plI].k]: pl[plMoves[plI].k] + (plMoves[plI].unit === "seconds" ? 5 : 1) })} className="w-14 h-14 rounded-full bg-lime text-ink text-[28px]">+</button>
         </div>
         <div className="t-small text-muted mt-5 text-center">Actually do it, then tap in what you got. This is the first line in your ledger. It'll be easy; that's the point.</div>
-        <Next label={plI < 2 ? "Next move" : "See my starting level"} onClick={() => (plI < 2 ? setPlI(plI + 1) : setStep(4))} />
+        <Next label={plI < 2 ? "Next move" : "See my starting level"} onClick={() => (plI < 2 ? setPlI(plI + 1) : setStep(5))} />
       </div>}
 
-      {step === 4 && <div className="a-rise flex flex-col flex-1 pt-10">
+      {step === 5 && <div className="a-rise flex flex-col flex-1 pt-10">
         <H eyebrow="One more · optional" title="Who are you doing this for?" sub="Not a goal. A person, or a version of you. The mascot brings it up exactly twice: day 30 and day 100. Nobody else sees it." />
         <div className="flex flex-wrap gap-2 mt-6">{["My kids", "Future me", "My partner", "A parent who couldn't", "Someone else"].map((w) => <button key={w} onClick={() => setWho(w)} className={`h-10 px-3.5 rounded-full border-[1.5px] font-bold text-[13px] ${who === w ? "border-lime bg-lime/8" : "border-ink-4 bg-ink-3"}`}>{w}</button>)}</div>
         <label htmlFor="why" className="t-micro text-muted mt-6 block">In your words (optional)</label>
@@ -115,7 +134,7 @@ export default function Start() {
         <Next label="Save and continue" />
       </div>}
 
-      {step === 5 && <div className="a-rise flex flex-col flex-1 pt-8">
+      {step === 6 && <div className="a-rise flex flex-col flex-1 pt-8">
         <div className="t-micro text-lime">Day one · +60 XP</div>
         <div className="display t-h1 mt-2.5">That's your first number.<br />Tomorrow, beat it.</div>
         <div className="grid grid-cols-3 gap-2 mt-5">

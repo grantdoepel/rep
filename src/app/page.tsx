@@ -1,16 +1,20 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProofShot } from "@/components/ProofShot";
 import { useStore } from "@/lib/store";
 import { MOVEMENT_BY_ID, TRACKS } from "@/lib/content";
 import { addDays, dayOfWeek, localDate, mascotLine, weekStart } from "@/lib/rules";
-import { Avatar, Icon, Mascot, Pulse, Section, TabBar, Wordmark } from "@/components/ui";
+import { promiseState } from "@/lib/promise";
+import { RESCUE_DEFAULT, RESCUE_MIN_POINTS, computeRescueAt, formatLeft, isEvening, isRescueHour, markRescueShown, minutesUntilMidnight, readSetStarts, recordSetStart } from "@/lib/evening";
+import { track } from "@/lib/analytics";
+import { Avatar, Icon, Mascot, Pulse, Section, TabBar, Wordmark, haptic } from "@/components/ui";
 import { CrewCard } from "@/components/bets/CrewCard";
 import { TestSetCard } from "@/components/bets/TestSetCard";
 import { MovedNote } from "@/components/bets/MovedNote";
 import { PlanBadge } from "@/components/bets/PlanBadge";
+import { NotePlayback } from "@/components/bets/NotePlayback";
 
 export default function Home() {
   const s = useStore();
@@ -27,10 +31,27 @@ export default function Home() {
     }, () => {}, { maximumAge: 300000, timeout: 8000 });
   }, [s.hydrated, s.profile.gymLat, s.profile.gymLng]);
 
+  // PRD 2 · learn rescueAt from when you usually start a Set. Only a data-backed value may overwrite the server's.
+  const learned = useRef(false);
+  useEffect(() => {
+    if (!s.hydrated || !s.onboarded || learned.current) return;
+    learned.current = true;
+    const starts = readSetStarts();
+    const next = computeRescueAt(starts);
+    if (!s.profile.rescueAt) s.patchProfile({ rescueAt: next });
+    else if (starts.length >= RESCUE_MIN_POINTS && next !== s.profile.rescueAt) s.patchProfile({ rescueAt: next });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.hydrated, s.onboarded]);
+
+  const todayStr = now ? localDate(now, s.profile.timezone) : "";
+  const doneTodayFlag = !!now && s.today?.status === "done" && s.today.date === todayStr;
+  const evening = !!now && !doneTodayFlag && isEvening(now, s.profile.rescueAt ?? RESCUE_DEFAULT);
+  useEffect(() => { if (evening && todayStr && markRescueShown(todayStr)) track("rescue_shown", { rescueAt: s.profile.rescueAt ?? RESCUE_DEFAULT }); }, [evening, todayStr, s.profile.rescueAt]);
+
   if (!s.hydrated || !s.onboarded || !now) return <div className="screen" />;
 
-  const today = localDate(now, s.profile.timezone);
-  const doneToday = s.today?.status === "done" && s.today.date === today;
+  const today = todayStr;
+  const doneToday = doneTodayFlag;
   const hour = now.getHours();
   const atRisk = !doneToday && hour >= 21;
   const monday = dayOfWeek(today) === 1 && s.seenMonday !== weekStart(today) && s.xpTotal > 60;
@@ -48,11 +69,70 @@ export default function Home() {
   const tierName = s.leagueTier[0].toUpperCase() + s.leagueTier.slice(1);
   const placement = s.xpTotal < 400 && s.log.length < 7;   // first week: you're being placed, not ranked
 
+  // PRD 1 · the promise is the headline
+  const promise = promiseState(s.log, s.profile, today);
+  const streakLine = s.streak.current === 0 ? "Day one" : `${s.streak.current} day${s.streak.current === 1 ? "" : "s"}`;
+  // PRD 2 (c) · back after midnight with yesterday missed: one line, no shame
+  const slipped = !doneToday && s.log.find((l) => l.date === addDays(today, -1))?.kind === "missed";
+
   // the ledger: last time vs. today, per move
   const ledger = (set?.moves ?? []).map((m) => { const prev = s.recent[m.movement]; const last = prev && prev.date < today ? prev.achieved : null; return { id: m.movement, name: MOVEMENT_BY_ID[m.movement]?.name ?? m.movement, unit: m.unit, target: m.target, last }; });
   const beats = doneToday && s.lastDone ? s.lastDone.moves.filter((m) => { const prev = s.recent[m.movement]; return prev && prev.date === today && (m.achieved ?? 0) > 0; }).length : 0;
-  const start = (kind: "normal" | "rescue") => { s.startSet(kind); router.push("/set"); };
+  const start = (kind: "normal" | "rescue", via: "home" = "home") => { recordSetStart(now); s.startSet(kind, via); router.push("/set"); };
 
+  // ---------- PRD 2 (b) · the evening layout ----------
+  if (evening) {
+    const left = minutesUntilMidnight(now);
+    const rescue = isRescueHour(now, s.profile.rescueAt);
+    const people = (s.crew?.members ?? s.friends).slice(0, 6).map((m) => ({ id: m.id, name: m.displayName, doneToday: m.doneToday, color: m.color, isYou: "isYou" in m ? !!m.isYou : false }));
+    const freezes = s.streak.freezes;
+    const go = () => { track("rescue_started", { kind: rescue ? "rescue" : "normal", left, rescueAt: s.profile.rescueAt ?? RESCUE_DEFAULT }); start(rescue ? "rescue" : "normal"); };
+    const tap = (p: { id: string; doneToday: boolean; isYou: boolean }) => { if (p.doneToday || p.isYou || s.nudgedToday.includes(p.id)) return; haptic(); s.nudge(p.id); };
+    return (
+      <div className="screen">
+        <header className="safe-top px-6 pt-8 flex items-center justify-between">
+          <Wordmark size={24} />
+          <Link href="/profile" aria-label="Profile" className="press"><Avatar initials={s.profile.displayName.slice(0, 2).toUpperCase()} color="#1A1C24" fg="#C8FF3D" size={40} /></Link>
+        </header>
+
+        <section className="px-6 pt-8">
+          <div className="t-micro text-muted">Tonight</div>
+          <div className="display t-h1 mt-1.5 a-rise">{formatLeft(left)} left on your word</div>
+          <div className={`t-small font-semibold mt-2 ${promise.atRisk ? "text-coral" : "text-muted"}`}>{promise.kept ? `Week ${promise.N} kept · ${promise.K} of ${promise.P}` : promise.atRisk ? `Promise at risk · ${promise.K} of ${promise.P} kept` : `Week ${promise.N} · ${promise.K} of ${promise.P} kept`}</div>
+        </section>
+
+        {people.length > 0 && (
+          <section className="px-6 mt-6">
+            <div className="flex items-center gap-3">
+              {people.map((p) => {
+                const nudged = s.nudgedToday.includes(p.id);
+                const can = !p.doneToday && !p.isYou && !nudged;
+                return (
+                  <button key={p.id} onClick={() => tap(p)} disabled={!can} aria-label={p.doneToday ? `${p.name} is done` : nudged ? `${p.name} nudged` : `Nudge ${p.name}`} className={`press rounded-full p-0.5 border-2 ${p.doneToday ? "border-lime" : nudged ? "border-transparent opacity-50" : "border-transparent opacity-80"}`}>
+                    <Avatar initials={p.name.slice(0, 2).toUpperCase()} color={p.color} size={40} />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="t-small text-muted-2 mt-2">{people.filter((p) => p.doneToday).length} of {people.length} moved today. Tap someone who hasn't.</div>
+          </section>
+        )}
+
+        <div className="px-6 mt-5"><NotePlayback today={today} /></div>
+
+        <section className="px-6 mt-5">
+          <button onClick={go} className="press flex items-center justify-center gap-2.5 h-[58px] rounded-2xl bg-lime text-ink font-extrabold text-[17px] w-full"><Icon.Play color="#0C0D11" />{rescue ? "Rescue Set · 3 min" : "Start"}</button>
+          <button onClick={() => { if (s.useFreeze()) router.refresh(); }} disabled={freezes === 0} className="press mt-3 w-full h-11 t-small font-semibold text-muted disabled:opacity-40 text-center">Use a freeze ({freezes} banked)</button>
+        </section>
+
+        <div className="mx-6 mt-4"><Mascot line={rescue ? `${streakLine}. Three minutes. I swapped today's Set for something you can do in socks.` : `Not late late. Late enough that I'm mentioning it. Today's Set is ${set?.plannedMinutes ?? 10} minutes.`} mood="worried" /></div>
+        <div className="h-5" />
+        <TabBar />
+      </div>
+    );
+  }
+
+  // ---------- the morning layout ----------
   return (
     <div className="screen">
       <header className="safe-top px-6 pt-8 flex items-center justify-between">
@@ -63,18 +143,15 @@ export default function Home() {
         </div>
       </header>
 
-      {/* the week as one line */}
+      {/* the week as one line: the promise, then the pulse */}
       <section className="px-6 pt-6">
-        <div className="flex items-end justify-between">
-          <div>
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
             <div className="t-micro text-muted">{isRest && !doneToday ? "Rest day" : doneToday ? "Done" : atRisk ? "Streak at risk" : "Today"}</div>
-            <div className="display t-h1 mt-1.5 flex items-center gap-2">
-              {s.streak.current > 0 && <Icon.Flame size={26} className={atRisk ? "a-blink" : "a-flicker"} />}
-              <span>{s.streak.current === 0 ? "Day one" : `${s.streak.current} day${s.streak.current === 1 ? "" : "s"}`}</span>
-            </div>
+            <div className={`display t-h1 mt-1.5 ${promise.atRisk ? "text-coral" : ""}`}>{promise.headline}</div>
           </div>
-          <div className="text-right mb-1">
-            {!doneToday && <div className="t-small font-semibold text-text-2">today makes {s.streak.current + 1}</div>}
+          <div className="text-right mb-1 shrink-0">
+            <div className="t-small font-semibold text-text-2 flex items-center justify-end gap-1">{s.streak.current > 0 && <Icon.Flame size={16} className={atRisk ? "a-blink" : "a-flicker"} />}<span>{streakLine}</span></div>
             {s.streak.freezes > 0 && <div className="t-small text-muted-2 font-semibold">{s.streak.freezes} freeze{s.streak.freezes === 1 ? "" : "s"} banked</div>}
           </div>
         </div>
@@ -85,6 +162,8 @@ export default function Home() {
       <MovedNote today={today} />
       <TestSetCard today={today} />
       <PlanBadge />
+
+      {slipped && <div className="mx-6 mt-4 display t-h2 text-text-2 a-rise">Yesterday slipped. Today counts.</div>}
 
       {/* today's set: the one surface on the screen */}
       {set && !doneToday && (

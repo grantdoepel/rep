@@ -1,17 +1,18 @@
 // Edge function: Web Push delivery for uvu.
 //   kind "nudge":   { to: uuid, from: string }  — called by the nudges trigger via pg_net
-//   kind "evening": {}                           — called hourly by pg_cron; picks users at local 19:00 / 21:00 who haven't moved
+//   kind "evening": {}                           — called every 10 minutes by pg_cron (rep_evening10); picks users whose local
+//                                                  clock is in [rescue_at, rescue_at + 10min) with no kept day_log row for today
 // Auth: x-job-secret must match the Vault 'job_secret'. Secrets come from Vault via private_push_config() (service role only).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
 const LINES = {
-  seven: (streak: number) => `${streak} days. It's 7pm. Today's Set is 10 minutes. You vs. you.`,
-  nine: (streak: number) => `${streak} days. Three minutes. I swapped today's Set for something you can do in socks.`,
-  dayOne: () => "Day one is the only day that's ever hard. Five minutes.",
+  evening: (days: number) => `You said ${days} days. Tonight is one of them.`,
   nudge: (from: string) => `${from}: beat yesterday. I'm watching.`,
 };
+const KEPT = ["perfect", "done", "rest", "moved"];
+const WINDOW_MIN = 10;   // must match the rep_evening10 cadence in 0007_evening.sql
 
 type Sub = { endpoint: string; keys: { p256dh: string; auth: string } };
 
@@ -42,21 +43,32 @@ Deno.serve(async (req: Request) => {
   }
 
   if (kind === "evening") {
-    const { data: users } = await sb.from("profiles").select("id, timezone, streaks(current, last_counted_date), push_subscriptions(endpoint, keys)");
+    const { data: users } = await sb.from("profiles").select("id, timezone, rescue_at, promise_days, push_subscriptions(endpoint, keys)");
+    const nowD = new Date();
+    type Cand = { id: string; today: string; days: number; subs: Sub[] };
+    const cands: Cand[] = [];
     for (const u of users ?? []) {
       const subs = (u.push_subscriptions ?? []) as Sub[];
       if (!subs.length) continue;
-      let h = -1, today = "";
+      let mins = -1, today = "";
       try {
-        const parts = new Intl.DateTimeFormat("en-CA", { timeZone: u.timezone, hour: "2-digit", hour12: false, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+        const parts = new Intl.DateTimeFormat("en-CA", { timeZone: u.timezone, hour: "2-digit", minute: "2-digit", hour12: false, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(nowD);
         const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-        h = Number(get("hour")) % 24; today = `${get("year")}-${get("month")}-${get("day")}`;
+        mins = (Number(get("hour")) % 24) * 60 + Number(get("minute")); today = `${get("year")}-${get("month")}-${get("day")}`;
       } catch { continue; }
-      const st = Array.isArray(u.streaks) ? u.streaks[0] : u.streaks;
-      if (!st || st.last_counted_date === today) continue;
-      const line = h === 19 ? (st.current > 0 ? LINES.seven(st.current) : LINES.dayOne()) : h === 21 && st.current > 0 ? LINES.nine(st.current) : null;
-      if (!line) continue;
-      await push(u.id, subs, { title: "uvu", body: line, url: "/" });
+      const m = /^(\d{1,2}):(\d{2})/.exec(String(u.rescue_at ?? "21:00"));
+      const rescue = m ? Number(m[1]) * 60 + Number(m[2]) : 21 * 60;
+      if (mins < rescue || mins >= rescue + WINDOW_MIN) continue;
+      cands.push({ id: u.id, today, days: Number(u.promise_days ?? 4), subs });
+    }
+    if (cands.length) {
+      // one query: who among the candidates already has a kept day for their local today
+      const { data: kept } = await sb.from("day_log").select("user_id, date").in("user_id", cands.map((c) => c.id)).in("date", [...new Set(cands.map((c) => c.today))]).in("kind", KEPT);
+      const done = new Set((kept ?? []).map((r: { user_id: string; date: string }) => `${r.user_id}:${r.date}`));
+      for (const c of cands) {
+        if (done.has(`${c.id}:${c.today}`)) continue;
+        await push(c.id, c.subs, { title: "uvu", body: LINES.evening(c.days), url: "/" });
+      }
     }
   }
 
