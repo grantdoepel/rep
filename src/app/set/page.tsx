@@ -4,11 +4,126 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { MOVEMENT_BY_ID, TRACKS } from "@/lib/content";
+import { track } from "@/lib/analytics";
+import { CHAIR_STAND, writeLocalTest } from "@/lib/tests";
 import { Icon, Ring, haptic } from "@/components/ui";
+import { Vee } from "@/components/Vee";
 
 const GYM_SWAP: Record<string, string> = { full_pushup: "bench press", knee_pushup: "incline bench", bodyweight_squat: "goblet squat", split_squat: "leg press", door_row: "lat pulldown", table_row: "seated row" };
 
 export default function SetPage() {
+  const s = useStore();
+  // Lock the mode on first sight of the active Set so finishing (active → undefined) doesn't swap screens mid-redirect.
+  const [mode, setMode] = useState<"test" | "normal" | null>(null);
+  if (mode === null && s.active) setMode(s.active.test ? "test" : "normal");
+  if (mode === "test") return <TestRun />;
+  return <NormalSet />;
+}
+
+// PRD 7 · the Test Set: one move, a 30-second countdown, tap to count. Auto-starts on the first tap, auto-finishes at 0.
+function TestRun() {
+  const s = useStore();
+  const router = useRouter();
+  const [count, setCount] = useState(0);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [intro, setIntro] = useState(true);
+  const finishing = useRef(false);
+  const countRef = useRef(0);   // what finish() reads; kept in step by the tap handlers
+  const total = CHAIR_STAND.seconds * 1000;
+
+  useEffect(() => { if (s.hydrated && !s.active && !finishing.current) router.replace("/"); }, [s.hydrated, s.active, router]);
+  useEffect(() => { const t = setTimeout(() => setIntro(false), 15000); return () => clearTimeout(t); }, []);
+  useEffect(() => {
+    if (startedAt === null) return;
+    const t = setInterval(() => setElapsedMs(Math.min(total, Date.now() - startedAt)), 100);
+    return () => clearInterval(t);
+  }, [startedAt, total]);
+
+  const finish = () => {
+    if (finishing.current) return;
+    finishing.current = true;
+    const achieved = countRef.current;
+    const today = s.active?.date ?? "";
+    if (today) writeLocalTest({ date: today, achieved });
+    track("test_done", { test: CHAIR_STAND.id, achieved });
+    haptic([14, 60, 22]);
+    const r = s.finishSet({ index: 0, achieved });
+    router.push(`/done?xp=${r.xp}&perfect=${r.perfect ? 1 : 0}&crowns=${r.crownUps.join(",")}&beats=${r.beats}&moves=${r.moves}`);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (startedAt !== null && elapsedMs >= total) finish(); }, [elapsedMs, startedAt, total]);
+
+  const set = s.active;
+  const move = set?.moves[0];
+  if (!set || !move) return <div className="screen" />;
+  const running = startedAt !== null && elapsedMs < total;
+  const remaining = Math.max(0, Math.ceil((total - elapsedMs) / 1000));
+  const ringValue = startedAt === null ? 1 : Math.max(0, (total - elapsedMs) / total);
+  const prev = s.recent[move.movement];
+  const last = prev && prev.date < set.date ? prev.achieved : null;
+  const beat = last !== null && count > last;
+
+  const tap = () => {
+    if (finishing.current || (startedAt !== null && elapsedMs >= total)) return;
+    if (startedAt === null) { setStartedAt(Date.now()); setIntro(false); }
+    countRef.current = Math.min(99, countRef.current + 1); setCount(countRef.current); haptic(6);
+  };
+
+  return (
+    <div className="screen bg-ink">
+      <div className="safe-top px-6 pt-8">
+        <div className="flex items-center justify-between">
+          <Link href="/" aria-label="Close" className="press w-11 h-11 -ml-2 rounded-full flex items-center justify-center"><Icon.Close /></Link>
+          <div className="t-micro text-muted">Test Set · <span className="t-num tracking-normal">0:{String(remaining).padStart(2, "0")}</span></div>
+          <div className="w-11 h-11 -mr-2" />
+        </div>
+        <div className="flex gap-1.5 mt-4"><div className="flex-1 h-1 rounded-full bg-lime" style={{ opacity: running ? 1 : 0.45 }} /></div>
+      </div>
+
+      <div className="px-6 pt-7">
+        <div className="t-micro text-muted">Legs · monthly test</div>
+        <div className="display t-h1 mt-1.5">{CHAIR_STAND.name}</div>
+        {intro ? (
+          <div className="mt-3 flex gap-3 items-start a-rise">
+            <Vee size={44} mood="happy" bob className="shrink-0 -mt-1" />
+            <div className="t-small text-text-2 leading-[1.45] pt-1">Sit on a chair, arms crossed on your chest.<br />Your first tap starts the clock. Tap once per full stand.</div>
+          </div>
+        ) : (
+          <div className="t-small text-muted mt-2 leading-[1.45]">{running ? "Stand all the way up, sit all the way down." : "Tap the ring on your first stand. The clock starts with it."}</div>
+        )}
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center py-4">
+        <button onClick={tap} aria-label="Count one more" className="press relative">
+          <Ring value={ringValue} size={248} width={14} color="#C8FF3D" track="rgba(244,245,247,0.07)">
+            <div className="text-center">
+              <div className={`display t-hero ${beat ? "text-lime" : "text-text"}`} style={{ fontSize: 84 }}>{count}</div>
+              <div className="t-small font-semibold text-muted -mt-1">{startedAt === null ? "tap to start · +1" : running ? `${remaining}s left · tap for +1` : "time"}</div>
+            </div>
+          </Ring>
+          {running && <span className="absolute inset-0 rounded-full border-2 border-lime a-ring pointer-events-none" />}
+        </button>
+
+        <div className="mt-5 flex items-center gap-5">
+          <div className="text-center"><div className="t-micro text-muted-2">Last test</div><div className={`t-num text-[22px] ${last === null ? "text-muted-2" : "ghost"}`}>{last === null ? "—" : last}</div></div>
+          <div className="w-px h-8 bg-ink-4" />
+          <div className="text-center"><div className="t-micro text-muted-2">Seconds</div><div className="t-num text-[22px]">{CHAIR_STAND.seconds}</div></div>
+          <div className="w-px h-8 bg-ink-4" />
+          <div className="text-center min-w-[88px]"><div className="t-micro text-muted-2">Verdict</div><div className={`t-small font-bold mt-0.5 ${beat ? "text-lime" : "text-muted"}`}>{last === null ? "First time" : beat ? "Beat it" : count === last ? "Matched" : `${last - count + 1} to beat`}</div></div>
+        </div>
+
+        {running && <button onClick={() => { countRef.current = Math.max(0, countRef.current - 1); setCount(countRef.current); haptic(6); }} aria-label="One fewer" className="press mt-4 h-10 px-4 rounded-full text-muted t-small font-bold">− one</button>}
+      </div>
+
+      <div className="px-6 pb-8 safe-bottom">
+        <div className="t-small text-muted-2 text-center h-[58px] flex items-center justify-center">{startedAt === null ? "Finishes on its own at 30 seconds." : running ? "Keep going. It ends on its own." : "Logging your number."}</div>
+      </div>
+    </div>
+  );
+}
+
+function NormalSet() {
   const s = useStore();
   const router = useRouter();
   const [i, setI] = useState(0);
