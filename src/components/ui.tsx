@@ -76,24 +76,27 @@ export function Ring({ value, size = 120, width = 10, color = "#C8FF3D", track =
   );
 }
 
-/** Seven-day pulse: the week drawn as one line. kinds: perfect | done | rest | frozen | missed | today | future */
-export function Pulse({ days, width = 320, height = 72 }: { days: { label: string; kind: string }[]; width?: number; height?: number }) {
+/** Seven-day pulse: the week drawn as one line. kinds: perfect | done | rest | frozen | missed | moved | today | future.
+ *  "moved" is a hollow lime dot (credited from elsewhere, no XP). `target` (1-based) draws a small hairline tick at that day: the Promise's mark. */
+export function Pulse({ days, width = 320, height = 72, target }: { days: { label: string; kind: string }[]; width?: number; height?: number; target?: number }) {
   const n = days.length, pad = 14, step = (width - pad * 2) / (n - 1);
-  const y = (k: string) => (k === "perfect" ? 12 : k === "done" ? 18 : k === "rest" || k === "frozen" ? 26 : k === "today" ? 30 : 36);
+  const y = (k: string) => (k === "perfect" ? 12 : k === "done" || k === "moved" ? 18 : k === "rest" || k === "frozen" ? 26 : k === "today" ? 30 : 36);
   const pts = days.map((d, i) => [pad + i * step, y(d.kind)] as const);
-  const lastReal = days.reduce((a, d, i) => (["perfect", "done", "rest", "frozen", "missed"].includes(d.kind) ? i : a), -1);
+  const lastReal = days.reduce((a, d, i) => (["perfect", "done", "rest", "frozen", "missed", "moved"].includes(d.kind) ? i : a), -1);
   const path = pts.slice(0, Math.max(1, lastReal + 1)).map(([x, yy], i) => `${i ? "L" : "M"} ${x} ${yy}`).join(" ");
+  const tickX = target !== undefined && target >= 1 && target <= n ? pad + (target - 1) * step : undefined;
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" aria-label="This week" role="img" style={{ maxWidth: width, display: "block" }}>
+      {tickX !== undefined && <line x1={tickX} y1={1} x2={tickX} y2={7} stroke="#7D8494" strokeWidth="1" strokeLinecap="round" />}
       {lastReal > 0 && <path d={path} fill="none" stroke="#F4F5F7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="a-draw" style={{ "--len": 600 } as React.CSSProperties} />}
       {pts.map(([x, yy], i) => {
         const k = days[i].kind;
         const on = k === "perfect" || k === "done";
-        const fill = on ? "#C8FF3D" : k === "rest" || k === "frozen" ? "#8FB0FF" : k === "missed" ? "#2A2D38" : k === "today" ? "#0C0D11" : "transparent";
+        const fill = on ? "#C8FF3D" : k === "rest" || k === "frozen" ? "#8FB0FF" : k === "missed" ? "#2A2D38" : k === "today" || k === "moved" ? "#0C0D11" : "transparent";
         return (
           <g key={i}>
             {k === "today" && <circle cx={x} cy={yy} r="10" fill="none" stroke="#C8FF3D" strokeWidth="2" className="a-ring" style={{ transformBox: "fill-box", transformOrigin: "center" }} />}
-            <circle cx={x} cy={yy} r={k === "future" ? 4 : 6} fill={fill} stroke={k === "future" ? "#2A2D38" : k === "today" ? "#C8FF3D" : "none"} strokeWidth="2" />
+            <circle cx={x} cy={yy} r={k === "future" ? 4 : 6} fill={fill} stroke={k === "future" ? "#2A2D38" : k === "today" || k === "moved" ? "#C8FF3D" : "none"} strokeWidth="2" />
             <text x={x} y={height - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={k === "today" ? "#F4F5F7" : "#7D8494"}>{days[i].label}</text>
           </g>
         );
