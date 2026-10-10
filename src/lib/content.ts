@@ -38,6 +38,8 @@ export const MOVEMENTS: Movement[] = [
   m("leg_press", "Leg press", "legs", 3, ["gym"], "reps", "Feet mid-plate, lower until knees at 90°, don't lock out.", ["knees"]),
   m("rdl", "Romanian deadlift", "legs", 4, ["gym"], "reps", "Hinge at the hips, bar close, flat back, feel the hamstrings.", ["low_back"]),
   m("seated_leg_ext", "Seated leg extension", "legs", 1, ["home", "travel", "gym"], "reps", "Sit tall, straighten one leg, hold a second at the top.", [], { seated: true }),
+  // PRD 7 · the monthly Test Set move (30-second chair stand)
+  m("chair_stand_30s", "Chair stands", "legs", 1, ["home", "gym", "travel"], "reps", "Arms crossed. Stand all the way up, sit all the way down. Count every full stand in 30 seconds.", []),
   // CORE
   m("dead_bug", "Dead bug", "core", 1, ["home", "travel"], "reps", "Back flat on the floor, opposite arm and leg extend, slow.", []),
   m("hollow_hold", "Hollow hold", "core", 3, ["home", "travel", "gym"], "seconds", "Low back pressed into the floor, arms and legs hovering.", ["low_back"]),

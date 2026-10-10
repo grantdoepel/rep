@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { MOVEMENT_BY_ID, TRACKS } from "@/lib/content";
 import { addDays, localDate, weekStart } from "@/lib/rules";
 import { Avatar, Icon, Section, TopBar, useMounted } from "@/components/ui";
+import { CHAIR_STAND, shortMonthYear, useTestSeries } from "@/lib/tests";
 
 const CELL: Record<string, string> = { perfect: "#C8FF3D", done: "#6E8A1F", rest: "#3D4EFF", frozen: "#3D4EFF", missed: "#262A35", future: "#13151B" };
 
@@ -14,6 +15,7 @@ export default function Profile() {
   const [treatOpen, setTreatOpen] = useState(false);
   const [treatText, setTreatText] = useState("");
   const [treatMs, setTreatMs] = useState(30);
+  const testSeries = useTestSeries(s.ledger);   // PRD 7
   if (!mounted) return <div className="screen" />;
   const today = localDate(new Date(), s.profile.timezone);
   const joined = s.profile.createdAt.slice(0, 10);
@@ -28,7 +30,8 @@ export default function Profile() {
   const start = addDays(weekStart(today), -63);
   const weeks = Array.from({ length: 10 }, (_, w) => Array.from({ length: 7 }, (_, d) => { const date = addDays(start, w * 7 + d); const l = s.log.find((x) => x.date === date); return { date, kind: date > today ? "future" : date < joined ? "future" : l?.kind ?? "missed" }; }));
   // personal bests from the ledger
-  const bests = Object.entries(s.recent).map(([id, r]) => ({ id, name: MOVEMENT_BY_ID[id]?.name ?? id, unit: MOVEMENT_BY_ID[id]?.unit ?? "reps", ...r })).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  const lastTest = testSeries[testSeries.length - 1];
+  const bests = Object.entries(s.recent).filter(([id]) => id !== CHAIR_STAND.id).map(([id, r]) => ({ id, name: MOVEMENT_BY_ID[id]?.name ?? id, unit: MOVEMENT_BY_ID[id]?.unit ?? "reps", ...r })).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
 
   return (
     <div className="screen">
@@ -63,9 +66,11 @@ export default function Profile() {
         </div>
       </Section>
 
-      {bests.length > 0 && (
+      {(bests.length > 0 || lastTest) && (
         <Section title="Your numbers" right={<span className="t-small text-muted-2 font-semibold">last time</span>} className="mt-4">
-          <div className="flex flex-col">{bests.map((b) => <div key={b.id} className="flex items-center justify-between py-2 border-t border-hair first:border-t-0"><span className="t-body font-semibold">{b.name}</span><span className="t-num text-[17px]">{b.achieved}{b.unit === "seconds" ? "s" : ""}</span></div>)}</div>
+          <div className="flex flex-col">{bests.map((b) => <div key={b.id} className="flex items-center justify-between py-2 border-t border-hair first:border-t-0"><span className="t-body font-semibold">{b.name}</span><span className="t-num text-[17px]">{b.achieved}{b.unit === "seconds" ? "s" : ""}</span></div>)}
+            {lastTest && <div className="flex items-center justify-between py-2 border-t border-hair first:border-t-0"><span className="t-body font-semibold">Last Test</span><span className="t-num text-[17px]">{lastTest.achieved}<span className="t-small text-muted-2 font-semibold ml-1.5">· {shortMonthYear(lastTest.date)}</span></span></div>}
+          </div>
         </Section>
       )}
 
