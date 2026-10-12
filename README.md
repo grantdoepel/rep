@@ -25,6 +25,14 @@ With no env vars the app runs **local-first**: every screen works, state lives i
 5. Enable Apple + Google providers in Auth, set redirect to `https://<your-domain>/auth/callback`.
 6. Copy `.env.example` → `.env.local` and fill `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
+## iOS app
+
+`ios/` is a Capacitor shell around the deployed app (Apple Health, camera, push). `npm run ios` opens it in Xcode. Full steps: [docs/APP_STORE.md](docs/APP_STORE.md).
+
+## Fuel (fasting + meals)
+
+`src/lib/fasting.ts` builds fasting plans from stats and the training week inside fixed safety rails. Meal photos go to the `food_vision` edge function (secret `ANTHROPIC_API_KEY`; migration `0012_food_scans.sql`). Screens: `/fast`, `/fast/setup`, `/fast/meal`.
+
 ## Rules live in one place
 
 `src/lib/rules.ts` is the game: Set generator, XP, crown clears, streaks and freezes, adaptive targets, league normalization, mascot lines. `complete_set()` in `0001_schema.sql` mirrors the scoring so the server never trusts client XP.
