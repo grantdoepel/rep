@@ -14,6 +14,7 @@ import { CrewCard } from "@/components/bets/CrewCard";
 import { TestSetCard } from "@/components/bets/TestSetCard";
 import { MovedNote } from "@/components/bets/MovedNote";
 import { PlanBadge } from "@/components/bets/PlanBadge";
+import { FuelCard } from "@/components/fuel/FuelCard";
 import { NotePlayback } from "@/components/bets/NotePlayback";
 import { useHealthCredit } from "@/lib/health";
 import { testDue, useLocalTests } from "@/lib/tests";
@@ -167,6 +168,7 @@ export default function Home() {
       <MovedNote today={today} />
       <TestSetCard today={today} />
       <PlanBadge />
+      <FuelCard />
 
       {slipped && <div className="mx-6 mt-4 display t-h2 text-text-2 a-rise">Yesterday slipped. Today counts.</div>}
 

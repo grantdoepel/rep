@@ -6,6 +6,7 @@ import { planSet } from "./plans";
 import { addDays, applyCrownProgress, countDay, generateSet, localDate, scoreSet, tierFromScore, weekStart } from "./rules";
 import { MOVEMENT_BY_ID } from "./content";
 import { sync } from "./supabase";
+import type { Fuel } from "./food";
 
 export interface State {
   hydrated: boolean;
@@ -47,6 +48,7 @@ export interface State {
   notePlayedOn?: string;        // PRD 5: date the note was last played (one play per evening)
   testSkippedOn?: string;       // PRD 7: date the Test Set was last skipped
   lastHealthCheck?: string;     // PRD 4: ISO time of the last Health query
+  fuel?: Fuel;                  // Fuel: fasting plan, its XP log and meals (src/lib/fasting.ts, src/lib/food.ts)
 }
 
 type Actions = {

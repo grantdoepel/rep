@@ -27,11 +27,12 @@ export type HealthStore = Pick<State, "log" | "streak" | "online"> & {
 };
 
 // ---------- adapters ----------
-type Plugin = { requestAuthorization?: (o?: unknown) => Promise<unknown>; requestPermission?: (o?: unknown) => Promise<unknown>; queryWorkouts: (o: { startDate: string; endDate?: string }) => Promise<unknown> };
+type Plugin = { requestHealthPermissions?: (o: { permissions: string[] }) => Promise<unknown>; requestAuthorization?: (o?: unknown) => Promise<unknown>; requestPermission?: (o?: unknown) => Promise<unknown>; queryWorkouts: (o: { startDate: string; endDate?: string; includeHeartRate?: boolean; includeRoute?: boolean; includeSteps?: boolean }) => Promise<unknown> };
 function nativePlugin(): Plugin | null {
   if (typeof window === "undefined") return null;
   const w = window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> }; CapacitorHealth?: unknown };
-  const p = (w.Capacitor?.Plugins?.Health ?? w.CapacitorHealth) as Plugin | undefined;
+  // capacitor-health registers itself as "HealthPlugin" in the native shell (ios/).
+  const p = (w.Capacitor?.Plugins?.HealthPlugin ?? w.Capacitor?.Plugins?.Health ?? w.CapacitorHealth) as Plugin | undefined;
   return p && typeof p.queryWorkouts === "function" ? p : null;
 }
 function minutesOf(r: Record<string, unknown>): number {
@@ -46,14 +47,16 @@ export const capacitorHealth: HealthAdapter = {
   async requestPermission() {
     const p = nativePlugin(); if (!p) return false;
     try {
-      const r = (await (p.requestAuthorization ?? p.requestPermission)?.({ read: ["workouts"] })) as Record<string, unknown> | undefined;
+      const r = (p.requestHealthPermissions
+        ? await p.requestHealthPermissions({ permissions: ["READ_WORKOUTS", "READ_WEIGHT"] })
+        : await (p.requestAuthorization ?? p.requestPermission)?.({ read: ["workouts"] })) as Record<string, unknown> | undefined;
       return r === undefined || r.granted !== false;
     } catch { return false; }
   },
   async workoutsSince(isoStart) {
     const p = nativePlugin(); if (!p) return [];
     try {
-      const r = (await p.queryWorkouts({ startDate: isoStart, endDate: new Date().toISOString() })) as unknown;
+      const r = (await p.queryWorkouts({ startDate: isoStart, endDate: new Date().toISOString(), includeHeartRate: false, includeRoute: false, includeSteps: false })) as unknown;
       const rows = (Array.isArray(r) ? r : (r as { workouts?: unknown[]; result?: unknown[] })?.workouts ?? (r as { result?: unknown[] })?.result ?? []) as Record<string, unknown>[];
       return rows.map((w) => ({ source: String(w.sourceName ?? w.source ?? w.workoutType ?? w.type ?? "Health"), minutes: Math.round(minutesOf(w)), start: String(w.startDate ?? w.start ?? isoStart) }));
     } catch { return []; }
